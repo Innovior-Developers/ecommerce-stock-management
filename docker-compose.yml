@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  # Laravel Backend
+  laravel:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./ecommerce-stock-management:/var/www/html
+    environment:
+      - DB_CONNECTION=mongodb
+      - DB_DSN=mongodb://mongodb:27017
+      - DB_DATABASE=ecommerce_stock
+      - REDIS_HOST=redis
+      - CACHE_STORE=redis
+    depends_on:
+      - mongodb
+      - redis
+
+  # React Frontend
+  react:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000/api
+
+  # MongoDB
+  mongodb:
+    image: mongo:7.0
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: ecommerce_stock
+    volumes:
+      - mongodb_data:/data/db
+
+  # Redis
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  mongodb_data:
+  redis_data:

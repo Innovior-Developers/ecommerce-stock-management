@@ -1,0 +1,423 @@
+ecommerce-stock-management/
+├── app/
+│   ├── Console/
+│   │   ├── Commands/
+│   │   │   ├── GenerateReportsCommand.php
+│   │   │   ├── ProcessLowStockAlertsCommand.php
+│   │   │   ├── UpdateInventoryCommand.php
+│   │   │   └── BackupDataCommand.php
+│   │   └── Kernel.php
+│   ├── Events/
+│   │   ├── ProductCreated.php
+│   │   ├── StockUpdated.php
+│   │   ├── OrderPlaced.php
+│   │   ├── LowStockAlert.php
+│   │   └── InventoryAdjusted.php
+│   ├── Exceptions/
+│   │   ├── InsufficientStockException.php
+│   │   ├── InvalidProductException.php
+│   │   └── OrderProcessingException.php
+│   ├── Http/
+│   │   ├── Controllers/
+│   │   │   ├── Admin/
+│   │   │   │   ├── DashboardController.php
+│   │   │   │   ├── UserController.php
+│   │   │   │   ├── RoleController.php
+│   │   │   │   └── SystemSettingsController.php
+│   │   │   ├── Api/
+│   │   │   │   ├── ProductController.php
+│   │   │   │   ├── InventoryController.php
+│   │   │   │   ├── OrderController.php
+│   │   │   │   └── ReportController.php
+│   │   │   ├── Auth/
+│   │   │   │   ├── AuthenticatedSessionController.php
+│   │   │   │   ├── RegisteredUserController.php
+│   │   │   │   └── PasswordResetLinkController.php
+│   │   │   ├── Inventory/
+│   │   │   │   ├── ProductController.php
+│   │   │   │   ├── CategoryController.php
+│   │   │   │   ├── SupplierController.php
+│   │   │   │   ├── StockMovementController.php
+│   │   │   │   ├── InventoryAdjustmentController.php
+│   │   │   │   └── BarcodeController.php
+│   │   │   ├── Orders/
+│   │   │   │   ├── PurchaseOrderController.php
+│   │   │   │   ├── SalesOrderController.php
+│   │   │   │   ├── OrderItemController.php
+│   │   │   │   └── OrderStatusController.php
+│   │   │   ├── Reports/
+│   │   │   │   ├── InventoryReportController.php
+│   │   │   │   ├── SalesReportController.php
+│   │   │   │   ├── PurchaseReportController.php
+│   │   │   │   ├── ProfitLossController.php
+│   │   │   │   └── ExportController.php
+│   │   │   ├── Settings/
+│   │   │   │   ├── CompanyController.php
+│   │   │   │   ├── TaxController.php
+│   │   │   │   ├── CurrencyController.php
+│   │   │   │   └── NotificationController.php
+│   │   │   ├── Controller.php
+│   │   │   ├── DashboardController.php
+│   │   │   └── ProfileController.php
+│   │   ├── Middleware/
+│   │   │   ├── CheckRole.php
+│   │   │   ├── CheckPermission.php
+│   │   │   ├── LogActivity.php
+│   │   │   └── ValidateApiKey.php
+│   │   ├── Requests/
+│   │   │   ├── Auth/
+│   │   │   │   ├── LoginRequest.php
+│   │   │   │   └── RegisterRequest.php
+│   │   │   ├── Inventory/
+│   │   │   │   ├── StoreProductRequest.php
+│   │   │   │   ├── UpdateProductRequest.php
+│   │   │   │   ├── StoreCategoryRequest.php
+│   │   │   │   ├── StoreSupplierRequest.php
+│   │   │   │   └── StockAdjustmentRequest.php
+│   │   │   ├── Orders/
+│   │   │   │   ├── StorePurchaseOrderRequest.php
+│   │   │   │   ├── StoreSalesOrderRequest.php
+│   │   │   │   └── UpdateOrderStatusRequest.php
+│   │   │   └── Settings/
+│   │   │       ├── CompanySettingsRequest.php
+│   │   │       └── NotificationSettingsRequest.php
+│   │   ├── Resources/
+│   │   │   ├── ProductResource.php
+│   │   │   ├── CategoryResource.php
+│   │   │   ├── SupplierResource.php
+│   │   │   ├── OrderResource.php
+│   │   │   ├── StockMovementResource.php
+│   │   │   └── UserResource.php
+│   │   └── Kernel.php
+│   ├── Jobs/
+│   │   ├── ProcessInventoryImport.php
+│   │   ├── GenerateInventoryReport.php
+│   │   ├── SendLowStockNotification.php
+│   │   ├── UpdateProductPrices.php
+│   │   └── BackupDatabase.php
+│   ├── Listeners/
+│   │   ├── LogProductActivity.php
+│   │   ├── UpdateInventoryLevels.php
+│   │   ├── SendOrderNotification.php
+│   │   └── CreateAuditLog.php
+│   ├── Mail/
+│   │   ├── LowStockAlert.php
+│   │   ├── OrderConfirmation.php
+│   │   ├── PurchaseOrderCreated.php
+│   │   └── InventoryReport.php
+│   ├── Models/
+│   │   ├── Category.php
+│   │   ├── Supplier.php
+│   │   ├── Product.php
+│   │   ├── ProductVariant.php
+│   │   ├── StockMovement.php
+│   │   ├── PurchaseOrder.php
+│   │   ├── PurchaseOrderItem.php
+│   │   ├── SalesOrder.php
+│   │   ├── SalesOrderItem.php
+│   │   ├── InventoryAlert.php
+│   │   ├── AuditLog.php
+│   │   ├── Company.php
+│   │   ├── Location.php
+│   │   ├── Tax.php
+│   │   ├── Currency.php
+│   │   ├── Customer.php
+│   │   └── User.php
+│   ├── Notifications/
+│   │   ├── LowStockNotification.php
+│   │   ├── OrderStatusChanged.php
+│   │   ├── InventoryAlert.php
+│   │   └── SystemMaintenance.php
+│   ├── Observers/
+│   │   ├── ProductObserver.php
+│   │   ├── OrderObserver.php
+│   │   └── StockMovementObserver.php
+│   ├── Policies/
+│   │   ├── ProductPolicy.php
+│   │   ├── OrderPolicy.php
+│   │   ├── ReportPolicy.php
+│   │   └── UserPolicy.php
+│   ├── Providers/
+│   │   ├── AppServiceProvider.php
+│   │   ├── AuthServiceProvider.php
+│   │   ├── EventServiceProvider.php
+│   │   ├── RouteServiceProvider.php
+│   │   └── InventoryServiceProvider.php
+│   ├── Services/
+│   │   ├── InventoryService.php
+│   │   ├── OrderService.php
+│   │   ├── ReportService.php
+│   │   ├── NotificationService.php
+│   │   ├── BarcodeService.php
+│   │   ├── ExportService.php
+│   │   ├── ImportService.php
+│   │   └── PaymentService.php
+│   ├── Traits/
+│   │   ├── HasAuditLog.php
+│   │   ├── HasUuid.php
+│   │   ├── Searchable.php
+│   │   └── Filterable.php
+│   └── View/
+│       └── Components/
+│           ├── Alert.php
+│           ├── Modal.php
+│           ├── DataTable.php
+│           └── Chart.php
+├── bootstrap/
+│   ├── app.php
+│   ├── cache/
+│   └── providers.php
+├── config/
+│   ├── app.php
+│   ├── auth.php
+│   ├── cache.php
+│   ├── database.php
+│   ├── filesystems.php
+│   ├── inventory.php (custom)
+│   ├── logging.php
+│   ├── mail.php
+│   ├── permissions.php (custom)
+│   ├── queue.php
+│   ├── services.php
+│   └── session.php
+├── database/
+│   ├── factories/
+│   │   ├── CategoryFactory.php
+│   │   ├── SupplierFactory.php
+│   │   ├── ProductFactory.php
+│   │   ├── CustomerFactory.php
+│   │   └── UserFactory.php
+│   ├── migrations/
+│   │   ├── 2024_01_01_000000_create_companies_table.php
+│   │   ├── 2024_01_01_000001_create_locations_table.php
+│   │   ├── 2024_01_01_000002_create_categories_table.php
+│   │   ├── 2024_01_01_000003_create_suppliers_table.php
+│   │   ├── 2024_01_01_000004_create_customers_table.php
+│   │   ├── 2024_01_01_000005_create_products_table.php
+│   │   ├── 2024_01_01_000006_create_product_variants_table.php
+│   │   ├── 2024_01_01_000007_create_stock_movements_table.php
+│   │   ├── 2024_01_01_000008_create_purchase_orders_table.php
+│   │   ├── 2024_01_01_000009_create_purchase_order_items_table.php
+│   │   ├── 2024_01_01_000010_create_sales_orders_table.php
+│   │   ├── 2024_01_01_000011_create_sales_order_items_table.php
+│   │   ├── 2024_01_01_000012_create_inventory_alerts_table.php
+│   │   ├── 2024_01_01_000013_create_audit_logs_table.php
+│   │   ├── 2024_01_01_000014_create_taxes_table.php
+│   │   ├── 2024_01_01_000015_create_currencies_table.php
+│   │   └── 2024_01_01_000016_add_roles_and_permissions.php
+│   ├── seeders/
+│   │   ├── DatabaseSeeder.php
+│   │   ├── RoleSeeder.php
+│   │   ├── PermissionSeeder.php
+│   │   ├── UserSeeder.php
+│   │   ├── CategorySeeder.php
+│   │   ├── SupplierSeeder.php
+│   │   ├── ProductSeeder.php
+│   │   ├── CompanySeeder.php
+│   │   └── CurrencySeeder.php
+│   └── database.sqlite
+├── public/
+│   ├── assets/
+│   │   ├── images/
+│   │   │   ├── products/
+│   │   │   ├── logos/
+│   │   │   └── avatars/
+│   │   ├── css/
+│   │   └── js/
+│   ├── exports/
+│   ├── imports/
+│   ├── uploads/
+│   ├── index.php
+│   └── .htaccess
+├── resources/
+│   ├── css/
+│   │   ├── app.css
+│   │   ├── dashboard.css
+│   │   └── print.css
+│   ├── js/
+│   │   ├── app.js
+│   │   ├── dashboard.js
+│   │   ├── charts.js
+│   │   ├── barcode-scanner.js
+│   │   └── components/
+│   │       ├── product-search.js
+│   │       ├── stock-tracker.js
+│   │       └── order-manager.js
+│   ├── lang/
+│   │   ├── en/
+│   │   │   ├── auth.php
+│   │   │   ├── inventory.php
+│   │   │   ├── orders.php
+│   │   │   └── reports.php
+│   │   └── es/
+│   │       ├── auth.php
+│   │       ├── inventory.php
+│   │       ├── orders.php
+│   │       └── reports.php
+│   └── views/
+│       ├── auth/
+│       │   ├── login.blade.php
+│       │   ├── register.blade.php
+│       │   ├── forgot-password.blade.php
+│       │   └── reset-password.blade.php
+│       ├── components/
+│       │   ├── alert.blade.php
+│       │   ├── modal.blade.php
+│       │   ├── data-table.blade.php
+│       │   ├── pagination.blade.php
+│       │   ├── search-box.blade.php
+│       │   ├── status-badge.blade.php
+│       │   └── charts/
+│       │       ├── bar-chart.blade.php
+│       │       ├── line-chart.blade.php
+│       │       └── pie-chart.blade.php
+│       ├── dashboard/
+│       │   ├── index.blade.php
+│       │   ├── widgets/
+│       │   │   ├── inventory-summary.blade.php
+│       │   │   ├── recent-orders.blade.php
+│       │   │   ├── low-stock-alerts.blade.php
+│       │   │   └── sales-chart.blade.php
+│       │   └── partials/
+│       │       ├── sidebar.blade.php
+│       │       ├── header.blade.php
+│       │       └── footer.blade.php
+│       ├── inventory/
+│       │   ├── products/
+│       │   │   ├── index.blade.php
+│       │   │   ├── create.blade.php
+│       │   │   ├── edit.blade.php
+│       │   │   ├── show.blade.php
+│       │   │   └── import.blade.php
+│       │   ├── categories/
+│       │   │   ├── index.blade.php
+│       │   │   ├── create.blade.php
+│       │   │   └── edit.blade.php
+│       │   ├── suppliers/
+│       │   │   ├── index.blade.php
+│       │   │   ├── create.blade.php
+│       │   │   ├── edit.blade.php
+│       │   │   └── show.blade.php
+│       │   ├── stock-movements/
+│       │   │   ├── index.blade.php
+│       │   │   ├── create.blade.php
+│       │   │   └── show.blade.php
+│       │   └── adjustments/
+│       │       ├── index.blade.php
+│       │       └── create.blade.php
+│       ├── orders/
+│       │   ├── purchase/
+│       │   │   ├── index.blade.php
+│       │   │   ├── create.blade.php
+│       │   │   ├── edit.blade.php
+│       │   │   ├── show.blade.php
+│       │   │   └── receive.blade.php
+│       │   ├── sales/
+│       │   │   ├── index.blade.php
+│       │   │   ├── create.blade.php
+│       │   │   ├── edit.blade.php
+│       │   │   ├── show.blade.php
+│       │   │   └── fulfill.blade.php
+│       │   └── partials/
+│       │       ├── order-items.blade.php
+│       │       ├── order-status.blade.php
+│       │       └── order-timeline.blade.php
+│       ├── reports/
+│       │   ├── inventory/
+│       │   │   ├── stock-levels.blade.php
+│       │   │   ├── valuation.blade.php
+│       │   │   ├── movement-history.blade.php
+│       │   │   └── abc-analysis.blade.php
+│       │   ├── sales/
+│       │   │   ├── summary.blade.php
+│       │   │   ├── by-product.blade.php
+│       │   │   ├── by-customer.blade.php
+│       │   │   └── trends.blade.php
+│       │   ├── purchase/
+│       │   │   ├── summary.blade.php
+│       │   │   ├── by-supplier.blade.php
+│       │   │   └── cost-analysis.blade.php
+│       │   └── financial/
+│       │       ├── profit-loss.blade.php
+│       │       ├── cost-analysis.blade.php
+│       │       └── roi-analysis.blade.php
+│       ├── settings/
+│       │   ├── company/
+│       │   │   ├── profile.blade.php
+│       │   │   ├── locations.blade.php
+│       │   │   └── preferences.blade.php
+│       │   ├── users/
+│       │   │   ├── index.blade.php
+│       │   │   ├── create.blade.php
+│       │   │   ├── edit.blade.php
+│       │   │   └── roles.blade.php
+│       │   ├── system/
+│       │   │   ├── general.blade.php
+│       │   │   ├── notifications.blade.php
+│       │   │   ├── backup.blade.php
+│       │   │   └── logs.blade.php
+│       │   └── integrations/
+│       │       ├── payment.blade.php
+│       │       ├── shipping.blade.php
+│       │       └── api.blade.php
+│       ├── layouts/
+│       │   ├── app.blade.php
+│       │   ├── guest.blade.php
+│       │   ├── navigation.blade.php
+│       │   └── print.blade.php
+│       ├── livewire/
+│       │   ├── product-search.blade.php
+│       │   ├── stock-tracker.blade.php
+│       │   ├── order-manager.blade.php
+│       │   ├── inventory-alerts.blade.php
+│       │   └── dashboard-widgets.blade.php
+│       ├── profile/
+│       │   ├── edit.blade.php
+│       │   ├── partials/
+│       │   │   ├── delete-user-form.blade.php
+│       │   │   ├── update-password-form.blade.php
+│       │   │   └── update-profile-information-form.blade.php
+│       ├── dashboard.blade.php
+│       └── welcome.blade.php
+├── routes/
+│   ├── api.php
+│   ├── auth.php
+│   ├── console.php
+│   ├── web.php
+│   ├── admin.php
+│   └── inventory.php
+├── storage/
+│   ├── app/
+│   │   ├── exports/
+│   │   ├── imports/
+│   │   ├── backups/
+│   │   └── uploads/
+│   ├── framework/
+│   ├── logs/
+│   └── temp/
+├── tests/
+│   ├── Feature/
+│   │   ├── Auth/
+│   │   ├── Inventory/
+│   │   ├── Orders/
+│   │   └── Reports/
+│   ├── Unit/
+│   │   ├── Models/
+│   │   ├── Services/
+│   │   └── Helpers/
+│   ├── CreatesApplication.php
+│   └── TestCase.php
+├── vendor/
+├── .env
+├── .env.example
+├── .gitignore
+├── artisan
+├── composer.json
+├── composer.lock
+├── package.json
+├── package-lock.json
+├── phpunit.xml
+├── postcss.config.js
+├── README.md
+├── tailwind.config.js
+└── vite.config.js
