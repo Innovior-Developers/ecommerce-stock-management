@@ -1,0 +1,165 @@
+Step 3: Docker Commands - Step by Step
+3.1 Clean Up Any Existing Containers
+
+# Stop all running containers
+docker-compose down
+
+# Remove all containers and volumes
+docker-compose down -v
+
+# Clean up Docker system (optional)
+docker system prune -f
+
+***********
+3.2 Build and Start Services
+
+# Navigate to your project directory
+cd "C:\Users\CHAMA COMPUTERS\Downloads\Innovior IOT\esm"
+
+# Build and start all services
+docker-compose up --build
+
+# Or run in detached mode (background)
+docker-compose up -d --build
+
+***********
+3.3 Monitor the Startup
+
+# Watch logs for all services
+docker-compose logs -f
+
+# Or watch specific service logs
+docker-compose logs -f laravel
+docker-compose logs -f mongodb
+docker-compose logs -f redis
+
+Step 4: Verify Installation
+4.1 Check Container Status
+# Check all containers are running
+docker-compose ps
+
+# Should show something like:
+# Name                     Command               State           Ports
+# esm_laravel_1           /start.sh                Up      0.0.0.0:8000->8000/tcp
+# esm_mongodb_1           docker-entrypoint.sh ... Up      0.0.0.0:27017->27017/tcp
+# esm_redis_1             docker-entrypoint.sh ... Up      0.0.0.0:6379->6379/
+
+4.2 Install Laravel Dependencies
+# Enter the Laravel container
+docker-compose exec laravel bash
+
+# Install MongoDB package
+composer require mongodb/laravel-mongodb laravel/sanctum
+
+# Exit container
+exit
+
+4.3 Test Individual Services
+Test Laravel:curl http://localhost:8000
+Test MongoDB Connection:curl http://localhost:8000/test-mongo
+Test Redis Connection:curl http://localhost:8000/test-redis
+Test Full Stack:curl http://localhost:8000/test-full-stack
+Health Check:curl http://localhost:8000/health
+
+***************or*************
+
+Step 5: Using Docker Desktop
+If you prefer using Docker Desktop GUI:
+
+Open Docker Desktop
+Go to Containers/Apps
+Find your esm stack
+Click to expand and see all services
+Use the action buttons to:
+Start/Stop individual containers
+View logs
+Open terminal in container
+
+
+Step 6: Troubleshooting Commands
+If MongoDB connection fails:
+# Check MongoDB logs
+docker-compose logs mongodb
+
+# Connect to MongoDB container
+docker-compose exec mongodb mongo
+
+# Check if database exists
+use ecommerce_stock
+show collections
+
+If Redis connection fails:
+# Check Redis logs
+docker-compose logs redis
+
+# Connect to Redis container
+docker-compose exec redis redis-cli
+
+# Test Redis
+ping
+set test "hello"
+get test
+
+If Laravel fails to start:
+# Check Laravel logs
+docker-compose logs laravel
+
+# Enter Laravel container to debug
+docker-compose exec laravel bash
+
+# Check PHP extensions
+php -m | grep -E "(mongodb|redis)"
+
+# Check Laravel config
+php artisan config:show database
+
+*************************
+
+Step 7: Expected Results
+After successful setup, you should get these responses:
+
+Health Check (curl http://localhost:8000/health):
+
+{
+    "status": "healthy",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "services": {
+        "laravel": "running",
+        "mongodb": "configured",
+        "redis": "configured"
+    }
+}
+
+MongoDB Test (curl http://localhost:8000/test-mongo):
+
+{
+    "success": true,
+    "message": "MongoDB connection successful!",
+    "database": "ecommerce_stock",
+    "product_created": {
+        "_id": "...",
+        "name": "Test Product ...",
+        "price": 99.99
+    }
+}
+
+Redis Test (curl http://localhost:8000/test-redis):
+
+{
+    "success": true,
+    "message": "Redis connection successful!",
+    "test_data": {
+        "match": true
+    }
+}
+
+Step 8: Ready for Development
+Once all tests pass, you can:
+
+Start developing your backend features
+Use these endpoints to verify connectivity
+Build your Product, Order, and Inventory models
+Run this command to confirm everything is working:
+
+curl http://localhost:8000/test-full-stack
+

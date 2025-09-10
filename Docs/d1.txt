@@ -1,0 +1,91 @@
+How It Works with Docker
+1. Live Code Synchronization
+Your docker-compose.yml has this volume mapping:
+
+volumes:
+  - ./ecommerce-stock-management:/var/www/html
+
+  This means:
+
+✅ Any changes you make to your backend code are instantly reflected in the Docker container
+✅ No rebuild required for most code changes
+✅ Real-time development experience
+2. Your API Endpoints are Available
+Based on your routes/api.php, you can test these endpoints directly:
+
+# Auth endpoints
+POST http://localhost:8000/api/register
+POST http://localhost:8000/api/login
+
+# Protected endpoints (need Bearer token)
+GET  http://localhost:8000/api/products
+POST http://localhost:8000/api/products
+GET  http://localhost:8000/api/products/{id}
+PUT  http://localhost:8000/api/products/{id}
+DELETE http://localhost:8000/api/products/{id}
+
+# Test endpoints (from web.php)
+GET http://localhost:8000/test-mongo
+GET http://localhost:8000/test-redis
+GET http://localhost:8000/health
+
+Development Workflow
+✅ What You Can Do (No Restart Needed):
+Modify controller logic
+Update model methods
+Change routes
+Update validation rules
+Modify API responses
+🔄 What Requires Container Restart:
+
+# Only when you change:
+# - .env file
+# - composer.json (new packages)
+# - Config files that are cached
+
+# Restart with:
+docker-compose restart laravel
+
+Testing with Postman
+1. Register a User:
+
+POST http://localhost:8000/api/register
+Content-Type: application/json
+
+{
+    "name": "Test User",
+    "email": "test@example.com",
+    "password": "password123",
+    "password_confirmation": "password123"
+}
+
+2. Login and Get Token:
+POST http://localhost:8000/api/login
+Content-Type: application/json
+
+{
+    "email": "test@example.com",
+    "password": "password123"
+}
+3. Use Token for Protected Routes:
+GET http://localhost:8000/api/products
+Authorization: Bearer YOUR_TOKEN_HERE
+
+Verify Your Setup is Working
+# Check containers are running
+docker-compose ps
+
+# Should show:
+# esm_laravel_1  Up  0.0.0.0:8000->8000/tcp
+# esm_redis_1    Up  0.0.0.0:6379->6379/tcp
+
+Test endpoints:
+
+# Health check
+curl http://localhost:8000/health
+
+# MongoDB test
+curl http://localhost:8000/test-mongo
+
+# API test (should return products list)
+curl http://localhost:8000/api/products

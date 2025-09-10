@@ -1,0 +1,18 @@
+1. Test Laravel API
+
+curl http://localhost:8000/api/products
+
+2. Test MongoDB Connection
+
+curl http://localhost:8000/test-mongo
+
+
+*********************************
+
+This setup gives you:
+
+✅ Laravel with MongoDB + Redis
+✅ React frontend with API communication
+✅ Docker containers for all services
+✅ Proper networking between services
+✅ Development hot-reload for both Laravel and React

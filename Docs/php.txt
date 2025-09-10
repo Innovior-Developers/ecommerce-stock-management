@@ -1,0 +1,42 @@
+<?php
+
+namespace App\Models;
+
+use MongoDB\Laravel\Eloquent\Model;
+
+class Product extends Model
+{
+    protected $connection = 'mongodb';
+    protected $collection = 'products';
+
+    protected $fillable = [
+        'name',
+        'description',
+        'price',
+        'sku',
+        'category',
+        'variants',
+        'specifications',
+        'inventory',
+        'images',
+        'status'
+    ];
+
+    protected $casts = [
+        'price' => 'decimal:2',
+        'variants' => 'array',
+        'specifications' => 'array',
+        'inventory' => 'array',
+        'images' => 'array',
+    ];
+
+    public function scopeLowStock($query)
+    {
+        return $query->where('inventory.available', '<=', 10);
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->where('status', 'active');
+    }
+}

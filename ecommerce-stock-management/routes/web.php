@@ -5,7 +5,12 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\TestController;
 
 Route::get('/', function () {
-    return view('welcome');
+    return response()->json([
+        'message' => 'Laravel API is running!',
+        'timestamp' => now(),
+        'environment' => config('app.env'),
+        'database' => config('database.default')
+    ]);
 });
 
 Route::get('/dashboard', function () {
@@ -20,6 +25,21 @@ Route::middleware('auth')->group(function () {
 
 require __DIR__.'/auth.php';
 
-// Test routes for MongoDB connection
+// Test routes for connections
 Route::get('/test-mongo', [TestController::class, 'testMongoConnection']);
+Route::get('/test-redis', [TestController::class, 'testRedisConnection']);
 Route::get('/test-products', [TestController::class, 'getAllProducts']);
+Route::get('/test-full-stack', [TestController::class, 'testFullStack']);
+
+// Health check
+Route::get('/health', function() {
+    return response()->json([
+        'status' => 'healthy',
+        'timestamp' => now(),
+        'services' => [
+            'laravel' => 'running',
+            'mongodb' => config('database.default') === 'mongodb' ? 'configured' : 'not configured',
+            'redis' => config('cache.default') === 'redis' ? 'configured' : 'not configured'
+        ]
+    ]);
+});

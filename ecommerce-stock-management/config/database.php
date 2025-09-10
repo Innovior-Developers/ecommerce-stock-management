@@ -66,6 +66,9 @@ return [
             'database' => env('DB_DATABASE', 'ecommerce_stock'),
             'options' => [
                 'appName' => env('DB_APP_NAME', 'Cluster0'),
+                'ssl' => true,
+                'tls' => true,
+                'tlsAllowInvalidCertificates' => true,
             ],
         ],
 

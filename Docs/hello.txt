@@ -1,0 +1,56 @@
+Laravel Backend: http://localhost:8000
+React Frontend: http://localhost:3000
+MongoDB: localhost:27017
+Redis: localhost:6379
+
+# Build and start all services
+docker-compose up --build
+
+# Or run in background
+docker-compose up -d --build
+
+****************************************
+
+# Check all containers are running
+docker-compose ps
+
+# Check Laravel logs
+docker-compose logs laravel
+
+# Check React logs  
+docker-compose logs react
+
+****************************************
+
+# Enter Laravel container
+docker-compose exec laravel bash
+
+# Install missing packages
+composer require mongodb/laravel-mongodb laravel/sanctum
+
+# Generate API routes and test data
+php artisan make:controller Api/ProductController --api
+php artisan make:model Product
+
+# Run any pending migrations (if using SQL for some tables)
+php artisan migrate
+
+# Create test data
+php artisan tinker
+
+***************************
+
+Quick Verification Commands
+After starting Docker Desktop, run these to verify everything is working:
+
+# Check if Docker Desktop is running
+docker info
+
+# Start your stack
+docker-compose up -d --build
+
+# Check container status
+docker-compose ps
+
+# Test your Laravel backend
+curl http://localhost:8000/health

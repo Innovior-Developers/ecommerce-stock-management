@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Laravel Backend
   laravel:
@@ -10,45 +8,63 @@ services:
       - ./ecommerce-stock-management:/var/www/html
     environment:
       - DB_CONNECTION=mongodb
-      - DB_DSN=mongodb://mongodb:27017
       - DB_DATABASE=ecommerce_stock
       - REDIS_HOST=redis
       - CACHE_STORE=redis
+      - SESSION_DRIVER=redis
+      - QUEUE_CONNECTION=redis
+      - APP_ENV=local
+      - APP_DEBUG=true
     depends_on:
-      - mongodb
       - redis
+    networks:
+      - app-network
 
-  # React Frontend
-  react:
-    build: ./frontend
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./frontend:/app
-    environment:
-      - REACT_APP_API_URL=http://localhost:8000/api
+  # React Frontend (optional for now, since we're focusing on backend)
+  # react:
+  #   build: ./client
+  #   ports:
+  #     - "3000:3000"
+  #   volumes:
+  #     - ./client:/app
+  #     - /app/node_modules
+  #   environment:
+  #     - REACT_APP_API_URL=http://localhost:8000/api
+  #   depends_on:
+  #     - laravel
+  #   networks:
+  #     - app-network
 
   # MongoDB
-  mongodb:
-    image: mongo:7.0
-    restart: unless-stopped
-    ports:
-      - "27017:27017"
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: password
-      MONGO_INITDB_DATABASE: ecommerce_stock
-    volumes:
-      - mongodb_data:/data/db
+  # mongodb:
+  #   image: mongo:7.0
+  #   restart: unless-stopped
+  #   ports:
+  #     - "27017:27017"
+  #   environment:
+  #     MONGO_INITDB_ROOT_USERNAME: root
+  #     MONGO_INITDB_ROOT_PASSWORD: password
+  #     MONGO_INITDB_DATABASE: ecommerce_stock
+  #   volumes:
+  #     - mongodb_data:/data/db
+  #   networks:
+  #     - app-network
 
   # Redis
   redis:
-    image: redis:alpine
+    image: redis:7-alpine
+    restart: unless-stopped
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - app-network
 
 volumes:
-  mongodb_data:
   redis_data:
+
+networks:
+  app-network:
+    driver: bridge
