@@ -6,7 +6,7 @@ use MongoDB\Laravel\Eloquent\Model;
 use Illuminate\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\Authenticatable as AuthenticatableContract;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens;
+use Laravel\Passport\HasApiTokens;
 use MongoDB\Laravel\Relations\HasMany;
 
 class User extends Model implements AuthenticatableContract
@@ -16,11 +16,6 @@ class User extends Model implements AuthenticatableContract
     protected $connection = 'mongodb';
     protected $collection = 'users';
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
         'name',
         'email',
@@ -28,23 +23,16 @@ class User extends Model implements AuthenticatableContract
         'role',
         'status',
         'email_verified_at',
+        'provider',
+        'provider_id',
+        'avatar',
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var array<int, string>
-     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
@@ -58,5 +46,27 @@ class User extends Model implements AuthenticatableContract
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class, 'customer_id');
+    }
+
+    public function findForPassport($username)
+    {
+        return $this->where('email', $username)->first();
+    }
+
+    // Override for Passport compatibility with MongoDB
+    public function getKey()
+    {
+        return (string) $this->_id;
+    }
+
+    public function getKeyName()
+    {
+        return '_id';
+    }
+
+    // Custom method to validate password for Passport
+    public function validateForPassportPasswordGrant($password)
+    {
+        return app('hash')->check($password, $this->password);
     }
 }

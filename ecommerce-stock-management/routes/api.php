@@ -4,16 +4,17 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\InventoryController;
-use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\OAuthController;
 
-// Auth routes
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
+// OAuth routes (using custom OAuth controller for MongoDB)
+Route::post('/register', [OAuthController::class, 'register']);
+Route::post('/login', [OAuthController::class, 'login']);
+Route::post('/refresh-token', [OAuthController::class, 'refreshToken']);
 
-// Protected routes
-Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/logout', [AuthController::class, 'logout']);
-    Route::get('/user', [AuthController::class, 'user']);
+// Protected routes (require Passport token)
+Route::middleware('auth:api')->group(function () {
+    Route::post('/logout', [OAuthController::class, 'logout']);
+    Route::get('/user', [OAuthController::class, 'user']);
 
     // Product routes
     Route::apiResource('products', ProductController::class);
@@ -28,3 +29,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/{id}', [InventoryController::class, 'updateStock']);
     });
 });
+
+// Public routes (no authentication required)
+Route::get('/products', [ProductController::class, 'index']);
+Route::get('/products/{id}', [ProductController::class, 'show']);

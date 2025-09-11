@@ -1,0 +1,41 @@
+{
+    // ...existing code...
+    "require": {
+        "php": "^8.2",
+        "laravel/breeze": "^2.3",
+        "laravel/framework": "^12.0",
+        "laravel/passport": "^12.3",
+        "laravel/tinker": "^2.10.1",
+        "livewire/livewire": "^3.6",
+        "maatwebsite/excel": "^3.1",
+        "mongodb/laravel-mongodb": "^5.5",
+        "spatie/laravel-permission": "^6.21",
+        "stripe/stripe-php": "^17.5"
+    },
+    // ...existing code...
+}
+
+# Enter Laravel container
+docker-compose exec laravel bash
+
+# Remove Sanctum and install Passport
+composer remove laravel/sanctum
+composer require laravel/passport
+
+# Install Passport
+php artisan passport:install
+
+# Exit container
+exit
+
+********************
+
+# You're already in the Laravel container, so continue:
+
+# Remove the Sanctum config file
+rm config/sanctum.php
+
+# Clear all caches to remove any references
+php artisan config:clear
+php artisan cache:clear
+php artisan route:clear

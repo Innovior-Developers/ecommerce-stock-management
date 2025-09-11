@@ -62,7 +62,7 @@ return [
 
         'mongodb' => [
             'driver' => 'mongodb',
-            'dsn' => env('DB_DSN', 'mongodb://localhost:27017'),
+            'dsn' => env('DB_DSN', 'mongodb+srv://thisarad28_db_user:6UHRfWCAovAhmkuY@cluster0.t8fcwnt.mongodb.net/ecommerce_stock?retryWrites=true&w=majority&ssl=true&tls=true&tlsAllowInvalidCertificates=true'),
             'database' => env('DB_DATABASE', 'ecommerce_stock'),
             'options' => [
                 'appName' => env('DB_APP_NAME', 'Cluster0'),

@@ -1,0 +1,11 @@
+root@32e307200e42:/var/www/html# php artisan passport:setup-mongodb
+Setting up Passport OAuth clients in MongoDB...
+Personal Access Client ID: 68c2a85531a7a4a11c091bc2
+Password Grant Client ID: 68c2a85531a7a4a11c091bc3
+Password Grant Client Secret: M9tt4gzLmEFUvXubW6xyaFQZn8rIzmWaLffEHjBH
+OAuth clients created successfully!
+Add these to your .env file:
+PASSPORT_PERSONAL_ACCESS_CLIENT_ID=68c2a85531a7a4a11c091bc2
+PASSPORT_PERSONAL_ACCESS_CLIENT_SECRET=Xtt6Ocw6HNl9pqyAhNuP6oTWNWApp3Odrz8g9C2A
+PASSPORT_PASSWORD_GRANT_CLIENT_ID=68c2a85531a7a4a11c091bc3
+PASSPORT_PASSWORD_GRANT_CLIENT_SECRET=M9tt4gzLmEFUvXubW6xyaFQZn8rIzmWaLffEHjBH
