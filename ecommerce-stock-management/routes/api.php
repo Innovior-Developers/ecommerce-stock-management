@@ -6,14 +6,19 @@ use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\AuthController;
 
-// Auth routes
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
+// Public Auth routes
+Route::prefix('auth')->group(function () {
+    Route::post('/register', [AuthController::class, 'register']);
+    Route::post('/login', [AuthController::class, 'login']);
+});
 
 // Protected routes
-Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/logout', [AuthController::class, 'logout']);
-    Route::get('/user', [AuthController::class, 'user']);
+Route::middleware('auth:api')->group(function () {
+    // Auth user routes
+    Route::prefix('auth')->group(function () {
+        Route::post('/logout', [AuthController::class, 'logout']);
+        Route::get('/user', [AuthController::class, 'user']);
+    });
 
     // Product routes
     Route::apiResource('products', ProductController::class);

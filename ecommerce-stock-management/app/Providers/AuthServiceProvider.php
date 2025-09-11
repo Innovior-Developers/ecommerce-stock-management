@@ -19,6 +19,6 @@ class AuthServiceProvider extends ServiceProvider
     public function boot(): void
     {
         // Simple authentication for Phase 1
-        // No Passport dependencies
+        // OAuth features will be added in Phase 3
     }
 }
