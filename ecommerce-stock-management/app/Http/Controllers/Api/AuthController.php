@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -16,30 +17,29 @@ class AuthController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
-            'role' => 'sometimes|string|in:admin,manager,user',
         ]);
 
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
-            'role' => $validated['role'] ?? 'user',
+            'role' => 'user', // Default role
             'status' => 'active',
-            'email_verified_at' => now(),
+            'email_verified_at' => null,
         ]);
 
-        $token = $user->createApiToken();
+        $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
             'success' => true,
             'message' => 'User registered successfully',
             'user' => [
-                'id' => (string) $user->_id,
+                'id' => $user->_id,
                 'name' => $user->name,
                 'email' => $user->email,
                 'role' => $user->role,
             ],
-            'access_token' => $token,
+            'token' => $token,
             'token_type' => 'Bearer',
         ], 201);
     }
@@ -59,34 +59,36 @@ class AuthController extends Controller
             ]);
         }
 
-        if (!$user->isActive()) {
+        if ($user->status !== 'active') {
             return response()->json([
                 'success' => false,
                 'message' => 'Account is not active. Please contact administrator.',
             ], 403);
         }
 
-        $user->update(['last_login_at' => now()]);
-        $token = $user->createApiToken();
+        // Revoke all existing tokens
+        $user->tokens()->delete();
+
+        // Create new token
+        $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
             'success' => true,
             'message' => 'Login successful',
             'user' => [
-                'id' => (string) $user->_id,
+                'id' => $user->_id,
                 'name' => $user->name,
                 'email' => $user->email,
                 'role' => $user->role,
             ],
-            'access_token' => $token,
+            'token' => $token,
             'token_type' => 'Bearer',
         ]);
     }
 
     public function logout(Request $request)
     {
-        $user = $request->user();
-        $user->update(['api_token' => null]);
+        $request->user()->currentAccessToken()->delete();
 
         return response()->json([
             'success' => true,
@@ -96,16 +98,13 @@ class AuthController extends Controller
 
     public function user(Request $request)
     {
-        $user = $request->user();
-
         return response()->json([
             'success' => true,
             'user' => [
-                'id' => (string) $user->_id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'role' => $user->role,
-                'last_login_at' => $user->last_login_at,
+                'id' => $request->user()->_id,
+                'name' => $request->user()->name,
+                'email' => $request->user()->email,
+                'role' => $request->user()->role,
             ],
         ]);
     }

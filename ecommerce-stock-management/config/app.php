@@ -1,6 +1,7 @@
 <?php
 
 return [
+
     /*
     |--------------------------------------------------------------------------
     | Application Name
@@ -12,7 +13,7 @@ return [
     |
     */
 
-    'name' => env('APP_NAME', 'EcommerceStockManagement'),
+    'name' => env('APP_NAME', 'Laravel'),
 
     /*
     |--------------------------------------------------------------------------
@@ -100,7 +101,7 @@ return [
 
     'previous_keys' => [
         ...array_filter(
-            explode(',', env('APP_PREVIOUS_KEYS', ''))
+            explode(',', (string) env('APP_PREVIOUS_KEYS', ''))
         ),
     ],
 
@@ -122,30 +123,4 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
-    /*
-    |--------------------------------------------------------------------------
-    | Laravel Framework Service Providers
-    |--------------------------------------------------------------------------
-    |
-    | Here is where you can register service providers for the Laravel
-    | framework. These are classes that are called upon to provide
-    | various services to your application.
-    |
-    */
-
-    'providers' => [
-        Illuminate\Auth\AuthServiceProvider::class,
-        // ...other providers...
-
-        // Package Service Providers
-        Laravel\Passport\PassportServiceProvider::class,
-
-        // Application Service Providers
-        App\Providers\AppServiceProvider::class,
-        App\Providers\AuthServiceProvider::class,
-        App\Providers\PassportServiceProvider::class,
-        // App\Providers\BroadcastServiceProvider::class,
-        App\Providers\EventServiceProvider::class,
-        App\Providers\RouteServiceProvider::class,
-    ],
 ];

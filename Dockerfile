@@ -1,6 +1,6 @@
 FROM php:8.3-fpm
 
-# Install system dependencies
+# Install system dependencies including SSL certificates
 RUN apt-get update && apt-get install -y \
     git \
     curl \
@@ -14,17 +14,22 @@ RUN apt-get update && apt-get install -y \
     nginx \
     libzip-dev \
     ca-certificates \
-    openssl \
-    && update-ca-certificates \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    openssl
 
-# Install PHP extensions
+# Update SSL certificates
+RUN update-ca-certificates
+
+# Clear cache
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Install PHP extensions (including zip)
 RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip
 
-# Install MongoDB and Redis extensions
-RUN pecl install mongodb redis \
-    && docker-php-ext-enable mongodb redis
+# Install MongoDB PHP extension with SSL support
+RUN pecl install mongodb && docker-php-ext-enable mongodb
+
+# Install Redis PHP extension
+RUN pecl install redis && docker-php-ext-enable redis
 
 # Get latest Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -32,17 +37,11 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Set working directory
 WORKDIR /var/www/html
 
-# Copy composer files first
-COPY ./ecommerce-stock-management/composer.json ./
-
-# Install dependencies without scripts first
-RUN composer install --no-dev --no-scripts --no-autoloader --ignore-platform-reqs
-
-# Copy the rest of the application
+# Copy existing application directory contents
 COPY ./ecommerce-stock-management/ /var/www/html
 
-# Generate autoloader (without running post-install scripts)
-RUN composer dump-autoload --optimize --no-dev
+# Install dependencies
+RUN composer install --no-dev --optimize-autoloader
 
 # Set permissions
 RUN chown -R www-data:www-data /var/www/html \
@@ -55,7 +54,7 @@ COPY ./nginx.conf /etc/nginx/nginx.conf
 # Expose port 8000
 EXPOSE 8000
 
-# Copy and set start script permissions
+# Start script
 COPY ./start.sh /start.sh
 RUN chmod +x /start.sh
 

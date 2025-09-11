@@ -54,10 +54,3 @@ docker-compose ps
 
 # Test your Laravel backend
 curl http://localhost:8000/health
-
-*******************************************
-
-#To get live logs from your Laravel Docker container through Docker Desktop
-
-docker logs -f esm-redis-1
-docker logs -f esm-laravel-1
