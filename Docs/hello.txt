@@ -54,3 +54,6 @@ docker-compose ps
 
 # Test your Laravel backend
 curl http://localhost:8000/health
+
+# Watch logs for all services
+docker-compose logs -f

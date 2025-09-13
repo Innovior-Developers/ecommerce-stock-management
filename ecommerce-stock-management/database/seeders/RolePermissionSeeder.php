@@ -18,23 +18,14 @@ class RolePermissionSeeder extends Seeder
             ['email' => 'admin@example.com'],
             [
                 'name' => 'Admin User',
-                'password' => Hash::make('password123'),
+                'password' => Hash::make('admin123'), // Strong password for admin
                 'role' => 'admin',
                 'status' => 'active',
                 'email_verified_at' => now(),
             ]
         );
 
-        // Create regular user
-        User::firstOrCreate(
-            ['email' => 'user@example.com'],
-            [
-                'name' => 'Regular User',
-                'password' => Hash::make('password123'),
-                'role' => 'user',
-                'status' => 'active',
-                'email_verified_at' => now(),
-            ]
-        );
+        $this->command->info('✅ Admin user created successfully!');
+        $this->command->info('Admin Login: admin@example.com / admin123');
     }
 }

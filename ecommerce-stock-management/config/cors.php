@@ -1,12 +1,12 @@
 <?php
 
 return [
-    'paths' => ['api/*', 'oauth/*'],
+    'paths' => ['api/*', 'oauth/*', 'sanctum/csrf-cookie'],
     'allowed_methods' => ['*'],
-    'allowed_origins' => ['http://localhost:3000', 'http://127.0.0.1:3000'],
+    'allowed_origins' => ['*'], // For development only
     'allowed_origins_patterns' => [],
     'allowed_headers' => ['*'],
     'exposed_headers' => [],
     'max_age' => 0,
-    'supports_credentials' => true,
+    'supports_credentials' => true, // Change to true for authentication
 ];

@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use App\Models\OAuthClient;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Artisan;
 
 class SetupPassportMongoDB extends Command
 {
@@ -13,7 +14,16 @@ class SetupPassportMongoDB extends Command
 
     public function handle()
     {
-        $this->info('Setting up Passport OAuth clients in MongoDB...');
+        $this->info('Setting up Passport for MongoDB...');
+
+        // First, generate encryption keys
+        $this->info('Generating Passport encryption keys...');
+        Artisan::call('passport:keys', ['--force' => true]);
+        $this->info('✅ Encryption keys generated');
+
+        // Clear any existing clients
+        OAuthClient::truncate();
+        $this->info('Cleared existing OAuth clients');
 
         // Create Personal Access Client
         $personalAccessClient = OAuthClient::create([
@@ -43,7 +53,7 @@ class SetupPassportMongoDB extends Command
         $this->info('Password Grant Client ID: ' . $passwordClient->_id);
         $this->info('Password Grant Client Secret: ' . $passwordClient->secret);
 
-        $this->info('OAuth clients created successfully!');
+        $this->info('✅ OAuth clients created successfully!');
         $this->info('Add these to your .env file:');
         $this->info('PASSPORT_PERSONAL_ACCESS_CLIENT_ID=' . $personalAccessClient->_id);
         $this->info('PASSPORT_PERSONAL_ACCESS_CLIENT_SECRET=' . $personalAccessClient->secret);

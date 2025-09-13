@@ -31,7 +31,7 @@ return [
     |--------------------------------------------------------------------------
     */
     'tokens' => [
-        'access_token_lifetime' => env('OAUTH_ACCESS_TOKEN_LIFETIME', 3600), // 1 hour
-        'refresh_token_lifetime' => env('OAUTH_REFRESH_TOKEN_LIFETIME', 86400 * 30), // 30 days
+        'access_token_lifetime' => (int) env('OAUTH_ACCESS_TOKEN_LIFETIME', 3600), // Cast to int
+        'refresh_token_lifetime' => (int) env('OAUTH_REFRESH_TOKEN_LIFETIME', 86400 * 30), // Cast to int
     ],
 ];

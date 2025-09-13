@@ -4,12 +4,21 @@ use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\TestController;
 
+// Only respond to exact root path
 Route::get('/', function () {
     return response()->json([
         'message' => 'Laravel API is running!',
         'timestamp' => now(),
         'environment' => config('app.env'),
-        'database' => config('database.default')
+        'database' => config('database.default'),
+        'api_endpoints' => [
+            'health' => '/api/health',
+            'admin_login' => '/api/admin/login (POST)',
+            'customer_login' => '/api/customer/login (POST)',
+            'customer_register' => '/api/customer/register (POST)',
+            'products' => '/api/products',
+            'test' => '/api/test'
+        ]
     ]);
 });
 
@@ -25,13 +34,12 @@ Route::middleware('auth')->group(function () {
 
 require __DIR__.'/auth.php';
 
-// Test routes for connections
+// Test routes
 Route::get('/test-mongo', [TestController::class, 'testMongoConnection']);
 Route::get('/test-redis', [TestController::class, 'testRedisConnection']);
 Route::get('/test-products', [TestController::class, 'getAllProducts']);
 Route::get('/test-full-stack', [TestController::class, 'testFullStack']);
 
-// Health check
 Route::get('/health', function() {
     return response()->json([
         'status' => 'healthy',

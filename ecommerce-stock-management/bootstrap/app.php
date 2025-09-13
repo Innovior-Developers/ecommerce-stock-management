@@ -12,7 +12,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // Remove Sanctum middleware references
+        // Use only Passport middleware for API authentication
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
