@@ -21,7 +21,7 @@ Route::get('/test', function () {
 
 // Admin routes - using Passport OAuth
 Route::prefix('admin')->group(function () {
-    Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/login', [AuthController::class, 'adminLogin']);
 
     Route::middleware('auth:api')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);

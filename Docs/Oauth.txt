@@ -180,3 +180,75 @@ root@32e307200e42:/var/www/html# php artisan route:list | grep api
   GET|HEAD        api/products ..................................... Api\ProductController@index  
   GET|HEAD        api/products/{id} ................................. Api\ProductController@show  
   GET|HEAD        api/test .....................................................................  
+
+********************************************************
+
+
+  C:\Users\CHAMA COMPUTERS\Downloads\Innovior IOT\esm>docker-compose up --build -d
+[+] Building 35.2s (24/24) FINISHED                                          docker:desktop-linux
+ => [laravel internal] load build definition from Dockerfile                                 0.0s
+ => => transferring dockerfile: 1.82kB                                                       0.0s
+ => [laravel internal] load metadata for docker.io/library/composer:latest                   1.2s 
+ => [laravel internal] load metadata for docker.io/library/php:8.3-fpm                       1.2s 
+ => [laravel internal] load .dockerignore                                                    0.0s
+ => => transferring context: 2B                                                              0.0s 
+ => [laravel internal] load build context                                                    1.2s 
+ => => transferring context: 2.21MB                                                          1.1s 
+ => [laravel] FROM docker.io/library/composer:latest@sha256:68e926a477000f12e8645e82a020b84  0.0s 
+ => [laravel stage-0  1/16] FROM docker.io/library/php:8.3-fpm@sha256:204b6387b032ea6e5ca53  0.0s
+ => => resolve docker.io/library/php:8.3-fpm@sha256:204b6387b032ea6e5ca5333c6a335362467cc86  0.0s 
+ => CACHED [laravel stage-0  2/16] RUN apt-get update && apt-get install -y     git     cur  0.0s 
+ => CACHED [laravel stage-0  3/16] RUN update-ca-certificates                                0.0s 
+ => CACHED [laravel stage-0  4/16] RUN apt-get clean && rm -rf /var/lib/apt/lists/*          0.0s 
+ => CACHED [laravel stage-0  5/16] RUN docker-php-ext-install pdo_mysql mbstring exif pcntl  0.0s 
+ => CACHED [laravel stage-0  6/16] RUN pecl install mongodb && docker-php-ext-enable mongod  0.0s 
+ => CACHED [laravel stage-0  7/16] RUN pecl install redis && docker-php-ext-enable redis     0.0s 
+ => CACHED [laravel stage-0  8/16] COPY --from=composer:latest /usr/bin/composer /usr/bin/c  0.0s 
+ => CACHED [laravel stage-0  9/16] WORKDIR /var/www/html                                     0.0s 
+ => [laravel stage-0 10/16] COPY ./ecommerce-stock-management/ /var/www/html                 4.3s 
+ => [laravel stage-0 11/16] RUN composer install --no-interaction --optimize-autoloader --n  2.7s 
+ => [laravel stage-0 12/16] RUN composer dump-autoload --optimize &&     php artisan view:c  2.8s 
+ => [laravel stage-0 13/16] RUN chown -R www-data:www-data /var/www/html     && chmod -R 7  21.1s 
+ => [laravel stage-0 14/16] COPY ./nginx.conf /etc/nginx/nginx.conf                          0.0s 
+ => [laravel stage-0 15/16] COPY ./start.sh /start.sh                                        0.0s 
+ => [laravel stage-0 16/16] RUN chmod +x /start.sh                                           0.3s 
+ => [laravel] exporting to image                                                             1.5s 
+ => => exporting layers                                                                      1.5s 
+ => => writing image sha256:bd6ef4e807aeadefa57177a278532656ab215eaa760d8a2a517b9fdba9ecd20  0.0s 
+ => => naming to docker.io/library/esm-laravel                                               0.0s 
+ => [laravel] resolving provenance for metadata file                                         0.0s 
+[+] Running 4/4
+ ✔ laravel                  Built                                                            0.0s 
+ ✔ Network esm_app-network  Created                                                          0.2s 
+ ✔ Container esm-redis-1    Started                                                          0.5s 
+ ✔ Container esm-laravel-1  Started                                                          0.8s 
+
+C:\Users\CHAMA COMPUTERS\Downloads\Innovior IOT\esm>docker-compose exec laravel bash -lc "php artisan optimize:clear && php artisan route:list | grep oauth"
+
+   INFO  Clearing cached bootstrap files.
+
+  config .......................................................................... 53.70ms DONE
+  cache .......................................................................... 160.16ms DONE
+  compiled ........................................................................ 64.49ms DONE
+  events .......................................................................... 15.29ms DONE
+  routes .......................................................................... 52.21ms DONE
+  views ........................................................................... 88.29ms DONE
+
+  GET|HEAD        oauth/authorize passport.authorizations.authorize › Laravel\Passport › Author…
+  POST            oauth/authorize passport.authorizations.approve › Laravel\Passport › ApproveA…
+  DELETE          oauth/authorize passport.authorizations.deny › Laravel\Passport › DenyAuthori…  
+  GET|HEAD        oauth/clients passport.clients.index › Laravel\Passport › ClientController@fo…  
+  POST            oauth/clients passport.clients.store › Laravel\Passport › ClientController@st…  
+  PUT             oauth/clients/{client_id} passport.clients.update › Laravel\Passport › Client…  
+  DELETE          oauth/clients/{client_id} passport.clients.destroy › Laravel\Passport › Clien…  
+  GET|HEAD        oauth/personal-access-tokens passport.personal.tokens.index › Laravel\Passpor…  
+  POST            oauth/personal-access-tokens passport.personal.tokens.store › Laravel\Passpor…  
+  DELETE          oauth/personal-access-tokens/{token_id} passport.personal.tokens.destroy › La…  
+  GET|HEAD        oauth/scopes .. passport.scopes.index › Laravel\Passport › ScopeController@all  
+  POST            oauth/token passport.token › Laravel\Passport › AccessTokenController@issueTo…  
+  POST            oauth/token/refresh passport.token.refresh › Laravel\Passport › TransientToke…  
+  GET|HEAD        oauth/tokens passport.tokens.index › Laravel\Passport › AuthorizedAccessToken…  
+  DELETE          oauth/tokens/{token_id} passport.tokens.destroy › Laravel\Passport › Authoriz…  
+
+C:\Users\CHAMA COMPUTERS\Downloads\Innovior IOT\esm>
+

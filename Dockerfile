@@ -41,7 +41,16 @@ WORKDIR /var/www/html
 COPY ./ecommerce-stock-management/ /var/www/html
 
 # Install dependencies
-RUN composer install --no-dev --optimize-autoloader
+RUN composer install --no-interaction --optimize-autoloader --no-dev
+
+# Only run safe commands that don't require external services
+RUN composer dump-autoload --optimize && \
+    php artisan view:clear && \
+    php artisan route:clear && \
+    php artisan config:clear
+
+# Skip config:cache and route:cache during build
+# These will be run when the container starts and has access to Redis
 
 # Set permissions
 RUN chown -R www-data:www-data /var/www/html \

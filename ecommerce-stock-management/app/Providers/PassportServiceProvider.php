@@ -3,8 +3,10 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\File;
 use Laravel\Passport\Passport;
-use Laravel\Passport\RouteRegistrar;
 use App\Models\OAuthClient;
 use App\Models\OAuthAccessToken;
 use App\Models\OAuthRefreshToken;
@@ -28,32 +30,37 @@ class PassportServiceProvider extends ServiceProvider
      * Bootstrap services.
      * Called after all other service providers have been registered
      */
-    // public function boot(): void
-    // {
-    //     // Configure Passport to use custom MongoDB models instead of default Eloquent models
-    //     Passport::useClientModel(OAuthClient::class);
-    //     Passport::useTokenModel(OAuthAccessToken::class);
-    //     Passport::useRefreshTokenModel(OAuthRefreshToken::class);
+    public function boot(): void
+    {
+        // Use MongoDB-backed models
+        Passport::useClientModel(OAuthClient::class);
+        Passport::useTokenModel(OAuthAccessToken::class);
+        Passport::useRefreshTokenModel(OAuthRefreshToken::class);
 
-    //     // Register OAuth2 routes for token management
-    //     $this->registerRoutes();
+        // Do NOT call Passport::routes() on Passport v12
 
-    //     // Set token expiration times
-    //     Passport::tokensExpireIn(now()->addHours(1));           // Access tokens expire in 1 hour
-    //     Passport::refreshTokensExpireIn(now()->addDays(30));    // Refresh tokens expire in 30 days
-    //     Passport::personalAccessTokensExpireIn(now()->addMonths(6)); // Personal access tokens expire in 6 months
-    // }
+        // Optional: define scopes
+        Passport::tokensCan([
+            'admin' => 'Full admin access',
+            'customer' => 'Customer actions',
+        ]);
 
-    /**
-     * Register Passport OAuth2 routes
-     * Uncomment and customize as needed for specific route requirements
-     */
-    // protected function registerRoutes()
-    // {
-    //     Passport::routes(function (RouteRegistrar $router) {
-    //         $router->forAccessTokens();        // Routes for access token management
-    //         $router->forPersonalAccessTokens(); // Routes for personal access tokens
-    //         $router->forTransientTokens();      // Routes for transient tokens
-    //     });
-    // }
+        // Token lifetimes (env overrides)
+        Passport::tokensExpireIn(now()->addSeconds((int) env('PASSPORT_ACCESS_TOKEN_TTL', 3600)));
+        Passport::refreshTokensExpireIn(now()->addSeconds((int) env('PASSPORT_REFRESH_TOKEN_TTL', 60 * 60 * 24 * 30)));
+        Passport::personalAccessTokensExpireIn(now()->addSeconds((int) env('PASSPORT_PERSONAL_TOKEN_TTL', 60 * 60 * 24 * 30 * 6)));
+
+        // Ensure keys exist in local/dev
+        if (App::environment(['local', 'development'])) {
+            $priv = storage_path('oauth-private.key');
+            $pub  = storage_path('oauth-public.key');
+            if (!File::exists($priv) || !File::exists($pub)) {
+                try {
+                    Artisan::call('passport:keys', ['--force' => true]);
+                } catch (\Throwable $e) {
+                    report($e); // non-blocking
+                }
+            }
+        }
+    }
 }
