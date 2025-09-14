@@ -40,9 +40,8 @@ return [
             'provider' => 'users',
         ],
 
-        // Passport API guard
         'api' => [
-            'driver' => 'passport',
+            'driver' => 'sanctum',
             'provider' => 'users',
         ],
     ],
@@ -66,9 +65,8 @@ return [
 
     'providers' => [
         'users' => [
-            // Eloquent provider + MongoDB auth model above
             'driver' => 'eloquent',
-            'model' => App\Models\User::class,
+            'model' => env('AUTH_MODEL', App\Models\User::class),
         ],
     ],
 
@@ -94,7 +92,7 @@ return [
     'passwords' => [
         'users' => [
             'provider' => 'users',
-            'table' => 'password_reset_tokens',
+            'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
             'expire' => 60,
             'throttle' => 60,
         ],
