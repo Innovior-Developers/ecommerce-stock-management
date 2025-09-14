@@ -20,10 +20,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Use our custom MongoDB-compatible PersonalAccessToken model
+        // Use our custom MongoDB PersonalAccessToken model
         Sanctum::usePersonalAccessTokenModel(\App\Models\PersonalAccessToken::class);
-
-        // For MongoDB, we don't need to ignore migrations since we handle them manually
-        // Just ensure the model is properly configured above
     }
 }

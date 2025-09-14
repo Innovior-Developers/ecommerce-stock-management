@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Gate;
+use Laravel\Sanctum\Sanctum;
 
 class AuthServiceProvider extends ServiceProvider
 {
@@ -20,6 +21,9 @@ class AuthServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->registerPolicies();
+
+        // Use our custom MongoDB PersonalAccessToken model
+        Sanctum::usePersonalAccessTokenModel(\App\Models\PersonalAccessToken::class);
 
         // Define custom gates for role-based access
         Gate::define('admin-access', function ($user) {

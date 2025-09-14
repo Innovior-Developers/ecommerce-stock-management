@@ -6,11 +6,14 @@ use MongoDB\Laravel\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Laravel\Sanctum\NewAccessToken;
 use Illuminate\Support\Str;
+// Use our custom NewAccessToken class
+use App\Models\NewAccessToken;
 
 class User extends Authenticatable
 {
+    // We keep this trait for some underlying Sanctum integrations,
+    // but we will override its main methods.
     use HasApiTokens, Notifiable, HasFactory;
 
     protected $connection = 'mongodb';
@@ -38,35 +41,19 @@ class User extends Authenticatable
         'password' => 'hashed',
     ];
 
-    protected static function boot()
-    {
-        parent::boot();
-
-        // Create indexes when model is first used
-        static::created(function ($model) {
-            try {
-                $collection = $model->getCollection();
-
-                // Create unique index for email
-                $collection->createIndex(['email' => 1], ['unique' => true]);
-
-                // Create index for role
-                $collection->createIndex(['role' => 1]);
-
-                // Create index for status
-                $collection->createIndex(['status' => 1]);
-            } catch (\Exception $e) {
-                // Ignore if indexes already exist
-            }
-        });
-    }
+    /**
+     * The access token the user is using for the current request.
+     *
+     * @var \App\Models\PersonalAccessToken
+     */
+    protected $accessToken;
 
     /**
      * Get the access tokens for the user.
      */
     public function tokens()
     {
-        return $this->morphMany(\App\Models\PersonalAccessToken::class, 'tokenable');
+        return $this->morphMany(PersonalAccessToken::class, 'tokenable');
     }
 
     /**
@@ -76,13 +63,41 @@ class User extends Authenticatable
     {
         $plainTextToken = Str::random(40);
 
+        /** @var \App\Models\PersonalAccessToken $token */
         $token = $this->tokens()->create([
             'name' => $name,
             'token' => hash('sha256', $plainTextToken),
             'abilities' => $abilities,
         ]);
 
-        return new NewAccessToken($token, $token->_id.'|'.$plainTextToken);
+        // Use the _id property for MongoDB and cast it to a string.
+        return new NewAccessToken($token, ((string) $token->_id).'|'.$plainTextToken);
+    }
+
+    /**
+     * Get the current access token being used by the user.
+     */
+    public function currentAccessToken()
+    {
+        return $this->accessToken;
+    }
+
+    /**
+     * Set the current access token for the user.
+     */
+    public function withAccessToken($accessToken)
+    {
+        $this->accessToken = $accessToken;
+
+        return $this;
+    }
+
+    /**
+     * Determine if the current API token has a given scope.
+     */
+    public function tokenCan(string $ability): bool
+    {
+        return $this->accessToken && $this->accessToken->can($ability);
     }
 
     // Relationships

@@ -19,7 +19,7 @@ Route::get('/test', function () {
     ]);
 });
 
-// Auth routes
+// Auth routes (for login, register, etc.)
 Route::prefix('auth')->group(function () {
     // Admin authentication
     Route::post('/admin/login', [AuthController::class, 'adminLogin']);
@@ -39,7 +39,7 @@ Route::prefix('auth')->group(function () {
     });
 });
 
-// Admin routes
+// Admin routes (for managing resources)
 Route::prefix('admin')->middleware(['auth:sanctum', 'ability:admin'])->group(function () {
     Route::apiResource('products', ProductController::class);
     Route::apiResource('categories', CategoryController::class);

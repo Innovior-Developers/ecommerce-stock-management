@@ -41,7 +41,7 @@ return [
         ],
 
         'api' => [
-            'driver' => 'sanctum',
+            'driver' => 'sanctum', // Change this from 'session' or remove it to use sanctum
             'provider' => 'users',
         ],
     ],

@@ -7,7 +7,6 @@ use App\Models\User;
 use App\Models\Customer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -41,21 +40,13 @@ class AuthController extends Controller
             ], 403);
         }
 
-        // Revoke all existing tokens
         $user->tokens()->delete();
-
-        // Create new token
         $token = $user->createToken('admin-token', ['admin'])->plainTextToken;
 
         return response()->json([
             'success' => true,
             'message' => 'Admin login successful',
-            'user' => [
-                'id' => $user->_id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'role' => $user->role,
-            ],
+            'user' => ['id' => $user->_id, 'name' => $user->name, 'email' => $user->email, 'role' => $user->role],
             'token' => $token,
             'token_type' => 'Bearer',
         ]);
@@ -72,7 +63,6 @@ class AuthController extends Controller
             'phone' => 'nullable|string|max:20',
         ]);
 
-        // Create user
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
@@ -82,27 +72,20 @@ class AuthController extends Controller
             'email_verified_at' => now(),
         ]);
 
-        // Create customer profile
         Customer::create([
-            'user_id' => $user->_id,
-            'first_name' => $validated['first_name'] ?? '',
+            'user_id' => (string) $user->_id,
+            'first_name' => $validated['first_name'] ?? $validated['name'],
             'last_name' => $validated['last_name'] ?? '',
             'phone' => $validated['phone'] ?? null,
             'marketing_consent' => false,
         ]);
 
-        // Create token
         $token = $user->createToken('customer-token', ['customer'])->plainTextToken;
 
         return response()->json([
             'success' => true,
             'message' => 'User registered successfully',
-            'user' => [
-                'id' => $user->_id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'role' => $user->role,
-            ],
+            'user' => ['id' => $user->_id, 'name' => $user->name, 'email' => $user->email, 'role' => $user->role],
             'token' => $token,
             'token_type' => 'Bearer',
         ], 201);
@@ -124,27 +107,16 @@ class AuthController extends Controller
         }
 
         if ($user->status !== 'active') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Account is not active.',
-            ], 403);
+            return response()->json(['success' => false, 'message' => 'Account is not active.'], 403);
         }
 
-        // Revoke all existing tokens
         $user->tokens()->delete();
-
-        // Create new token
         $token = $user->createToken('customer-token', ['customer'])->plainTextToken;
 
         return response()->json([
             'success' => true,
             'message' => 'Login successful',
-            'user' => [
-                'id' => $user->_id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'role' => $user->role,
-            ],
+            'user' => ['id' => $user->_id, 'name' => $user->name, 'email' => $user->email, 'role' => $user->role],
             'token' => $token,
             'token_type' => 'Bearer',
         ]);
@@ -153,17 +125,12 @@ class AuthController extends Controller
     public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Logged out successfully',
-        ]);
+        return response()->json(['success' => true, 'message' => 'Logged out successfully']);
     }
 
     public function user(Request $request)
     {
         $user = $request->user();
-
         return response()->json([
             'success' => true,
             'user' => [
