@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { 
-  Package, 
-  ShoppingCart, 
-  Users, 
-  DollarSign, 
-  TrendingUp, 
+import {
+  Package,
+  ShoppingCart,
+  Users,
+  DollarSign,
+  TrendingUp,
   AlertTriangle,
   Plus,
   Search,
@@ -18,7 +18,7 @@ import {
   Calendar,
   Star,
   Tag,
-  Folder
+  Folder,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,6 +50,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import Header from "@/components/Header";
 
 // Mock data
 const dashboardStats = [
@@ -59,7 +60,7 @@ const dashboardStats = [
     change: "+20.1%",
     trend: "up",
     icon: DollarSign,
-    color: "text-green-600"
+    color: "text-green-600",
   },
   {
     title: "Orders",
@@ -67,7 +68,7 @@ const dashboardStats = [
     change: "+15.3%",
     trend: "up",
     icon: ShoppingCart,
-    color: "text-blue-600"
+    color: "text-blue-600",
   },
   {
     title: "Customers",
@@ -75,7 +76,7 @@ const dashboardStats = [
     change: "+12.5%",
     trend: "up",
     icon: Users,
-    color: "text-purple-600"
+    color: "text-purple-600",
   },
   {
     title: "Products",
@@ -83,16 +84,46 @@ const dashboardStats = [
     change: "+5.2%",
     trend: "up",
     icon: Package,
-    color: "text-orange-600"
-  }
+    color: "text-orange-600",
+  },
 ];
 
 const recentOrders = [
-  { id: "#1234", customer: "John Doe", status: "Fulfilled", total: "$299.99", date: "2024-01-15" },
-  { id: "#1235", customer: "Jane Smith", status: "Pending", total: "$899.99", date: "2024-01-15" },
-  { id: "#1236", customer: "Bob Johnson", status: "Shipped", total: "$149.99", date: "2024-01-14" },
-  { id: "#1237", customer: "Alice Brown", status: "Delivered", total: "$599.99", date: "2024-01-14" },
-  { id: "#1238", customer: "Charlie Wilson", status: "Cancelled", total: "$79.99", date: "2024-01-13" },
+  {
+    id: "#1234",
+    customer: "John Doe",
+    status: "Fulfilled",
+    total: "$299.99",
+    date: "2024-01-15",
+  },
+  {
+    id: "#1235",
+    customer: "Jane Smith",
+    status: "Pending",
+    total: "$899.99",
+    date: "2024-01-15",
+  },
+  {
+    id: "#1236",
+    customer: "Bob Johnson",
+    status: "Shipped",
+    total: "$149.99",
+    date: "2024-01-14",
+  },
+  {
+    id: "#1237",
+    customer: "Alice Brown",
+    status: "Delivered",
+    total: "$599.99",
+    date: "2024-01-14",
+  },
+  {
+    id: "#1238",
+    customer: "Charlie Wilson",
+    status: "Cancelled",
+    total: "$79.99",
+    date: "2024-01-13",
+  },
 ];
 
 const lowStockProducts = [
@@ -114,7 +145,7 @@ const productsData = [
     image: "/src/assets/product-headphones.jpg",
     description: "High-quality wireless headphones with noise cancellation",
     rating: 4.8,
-    reviews: 124
+    reviews: 124,
   },
   {
     id: "2",
@@ -127,7 +158,7 @@ const productsData = [
     image: "/src/assets/product-watch.jpg",
     description: "Advanced fitness tracking with heart rate monitor",
     rating: 4.6,
-    reviews: 89
+    reviews: 89,
   },
   {
     id: "3",
@@ -140,7 +171,7 @@ const productsData = [
     image: "/src/assets/product-bag.jpg",
     description: "Handcrafted genuine leather bag for professionals",
     rating: 4.9,
-    reviews: 67
+    reviews: 67,
   },
   {
     id: "4",
@@ -153,8 +184,8 @@ const productsData = [
     image: "/src/assets/product-headphones.jpg",
     description: "Premium wireless earbuds with active noise cancellation",
     rating: 4.7,
-    reviews: 156
-  }
+    reviews: 156,
+  },
 ];
 
 // Mock customers data
@@ -169,7 +200,7 @@ const customersData = [
     totalSpent: 2456.78,
     status: "Active",
     joinDate: "2023-03-15",
-    lastOrder: "2024-01-15"
+    lastOrder: "2024-01-15",
   },
   {
     id: "2",
@@ -181,7 +212,7 @@ const customersData = [
     totalSpent: 3892.45,
     status: "VIP",
     joinDate: "2022-11-20",
-    lastOrder: "2024-01-14"
+    lastOrder: "2024-01-14",
   },
   {
     id: "3",
@@ -193,7 +224,7 @@ const customersData = [
     totalSpent: 567.23,
     status: "Active",
     joinDate: "2023-12-05",
-    lastOrder: "2024-01-12"
+    lastOrder: "2024-01-12",
   },
   {
     id: "4",
@@ -205,7 +236,7 @@ const customersData = [
     totalSpent: 4123.89,
     status: "VIP",
     joinDate: "2022-08-10",
-    lastOrder: "2024-01-13"
+    lastOrder: "2024-01-13",
   },
   {
     id: "5",
@@ -217,8 +248,8 @@ const customersData = [
     totalSpent: 89.99,
     status: "New",
     joinDate: "2024-01-01",
-    lastOrder: "2024-01-05"
-  }
+    lastOrder: "2024-01-05",
+  },
 ];
 
 // Mock categories data
@@ -229,7 +260,7 @@ const categoriesData = [
     description: "Electronic devices and gadgets",
     products: 45,
     status: "Active",
-    createdDate: "2023-01-15"
+    createdDate: "2023-01-15",
   },
   {
     id: "2",
@@ -237,7 +268,7 @@ const categoriesData = [
     description: "Clothing, accessories, and fashion items",
     products: 67,
     status: "Active",
-    createdDate: "2023-02-20"
+    createdDate: "2023-02-20",
   },
   {
     id: "3",
@@ -245,7 +276,7 @@ const categoriesData = [
     description: "Home decor and gardening supplies",
     products: 23,
     status: "Active",
-    createdDate: "2023-03-10"
+    createdDate: "2023-03-10",
   },
   {
     id: "4",
@@ -253,8 +284,8 @@ const categoriesData = [
     description: "Sports equipment and outdoor gear",
     products: 21,
     status: "Active",
-    createdDate: "2023-04-05"
-  }
+    createdDate: "2023-04-05",
+  },
 ];
 
 const AdminDashboard = () => {
@@ -262,27 +293,60 @@ const AdminDashboard = () => {
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
   const [isEditProductOpen, setIsEditProductOpen] = useState(false);
   const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [selectedProduct, setSelectedProduct] = useState<unknown>(null);
   const [productSearch, setProductSearch] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
   const [categorySearch, setCategorySearch] = useState("");
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      "Pending": { variant: "secondary" as const, className: "bg-yellow-100 text-yellow-800" },
-      "Fulfilled": { variant: "secondary" as const, className: "bg-green-100 text-green-800" },
-      "Shipped": { variant: "secondary" as const, className: "bg-blue-100 text-blue-800" },
-      "Delivered": { variant: "secondary" as const, className: "bg-emerald-100 text-emerald-800" },
-      "Cancelled": { variant: "destructive" as const, className: "bg-red-100 text-red-800" },
-      "Active": { variant: "secondary" as const, className: "bg-green-100 text-green-800" },
-      "Low Stock": { variant: "secondary" as const, className: "bg-yellow-100 text-yellow-800" },
-      "Out of Stock": { variant: "destructive" as const, className: "bg-red-100 text-red-800" },
-      "VIP": { variant: "secondary" as const, className: "bg-purple-100 text-purple-800" },
-      "New": { variant: "secondary" as const, className: "bg-blue-100 text-blue-800" },
+      Pending: {
+        variant: "secondary" as const,
+        className: "bg-yellow-100 text-yellow-800",
+      },
+      Fulfilled: {
+        variant: "secondary" as const,
+        className: "bg-green-100 text-green-800",
+      },
+      Shipped: {
+        variant: "secondary" as const,
+        className: "bg-blue-100 text-blue-800",
+      },
+      Delivered: {
+        variant: "secondary" as const,
+        className: "bg-emerald-100 text-emerald-800",
+      },
+      Cancelled: {
+        variant: "destructive" as const,
+        className: "bg-red-100 text-red-800",
+      },
+      Active: {
+        variant: "secondary" as const,
+        className: "bg-green-100 text-green-800",
+      },
+      "Low Stock": {
+        variant: "secondary" as const,
+        className: "bg-yellow-100 text-yellow-800",
+      },
+      "Out of Stock": {
+        variant: "destructive" as const,
+        className: "bg-red-100 text-red-800",
+      },
+      VIP: {
+        variant: "secondary" as const,
+        className: "bg-purple-100 text-purple-800",
+      },
+      New: {
+        variant: "secondary" as const,
+        className: "bg-blue-100 text-blue-800",
+      },
     };
 
-    const config = statusConfig[status as keyof typeof statusConfig] || { variant: "secondary" as const, className: "" };
-    
+    const config = statusConfig[status as keyof typeof statusConfig] || {
+      variant: "secondary" as const,
+      className: "",
+    };
+
     return (
       <Badge variant={config.variant} className={config.className}>
         {status}
@@ -290,35 +354,45 @@ const AdminDashboard = () => {
     );
   };
 
-  const filteredProducts = productsData.filter(product =>
-    product.name.toLowerCase().includes(productSearch.toLowerCase()) ||
-    product.sku.toLowerCase().includes(productSearch.toLowerCase()) ||
-    product.category.toLowerCase().includes(productSearch.toLowerCase())
+  const filteredProducts = productsData.filter(
+    (product) =>
+      product.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+      product.sku.toLowerCase().includes(productSearch.toLowerCase()) ||
+      product.category.toLowerCase().includes(productSearch.toLowerCase())
   );
 
-  const filteredCustomers = customersData.filter(customer =>
-    customer.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
-    customer.email.toLowerCase().includes(customerSearch.toLowerCase()) ||
-    customer.status.toLowerCase().includes(customerSearch.toLowerCase())
+  const filteredCustomers = customersData.filter(
+    (customer) =>
+      customer.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
+      customer.email.toLowerCase().includes(customerSearch.toLowerCase()) ||
+      customer.status.toLowerCase().includes(customerSearch.toLowerCase())
   );
 
-  const filteredCategories = categoriesData.filter(category =>
-    category.name.toLowerCase().includes(categorySearch.toLowerCase()) ||
-    category.description.toLowerCase().includes(categorySearch.toLowerCase())
+  const filteredCategories = categoriesData.filter(
+    (category) =>
+      category.name.toLowerCase().includes(categorySearch.toLowerCase()) ||
+      category.description.toLowerCase().includes(categorySearch.toLowerCase())
   );
 
   return (
     <div className="min-h-screen bg-muted/30">
+      {/* Admin Navbar */}
+      <Header isAdmin={true} />
       {/* Header */}
       <header className="bg-background border-b">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-              <p className="text-muted-foreground">Manage your e-commerce store</p>
+              <p className="text-muted-foreground">
+                Manage your e-commerce store
+              </p>
             </div>
             <div className="flex items-center gap-4">
-              <Dialog open={isAddProductOpen} onOpenChange={setIsAddProductOpen}>
+              <Dialog
+                open={isAddProductOpen}
+                onOpenChange={setIsAddProductOpen}
+              >
                 <DialogTrigger asChild>
                   <Button variant="default">
                     <Plus className="h-4 w-4" />
@@ -348,7 +422,9 @@ const AdminDashboard = () => {
                           <SelectValue placeholder="Select category" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="electronics">Electronics</SelectItem>
+                          <SelectItem value="electronics">
+                            Electronics
+                          </SelectItem>
                           <SelectItem value="fashion">Fashion</SelectItem>
                           <SelectItem value="home">Home & Garden</SelectItem>
                           <SelectItem value="sports">Sports</SelectItem>
@@ -365,11 +441,17 @@ const AdminDashboard = () => {
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="description">Description</Label>
-                      <Textarea id="description" placeholder="Product description" />
+                      <Textarea
+                        id="description"
+                        placeholder="Product description"
+                      />
                     </div>
                   </div>
                   <div className="flex justify-end gap-2">
-                    <Button variant="outline" onClick={() => setIsAddProductOpen(false)}>
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsAddProductOpen(false)}
+                    >
                       Cancel
                     </Button>
                     <Button onClick={() => setIsAddProductOpen(false)}>
@@ -384,7 +466,11 @@ const AdminDashboard = () => {
       </header>
 
       <div className="container mx-auto px-4 py-6">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="space-y-6"
+        >
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="products">Products</TabsTrigger>
@@ -427,11 +513,18 @@ const AdminDashboard = () => {
                 <CardContent>
                   <div className="space-y-4">
                     {recentOrders.slice(0, 5).map((order) => (
-                      <div key={order.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                      <div
+                        key={order.id}
+                        className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                      >
                         <div>
                           <p className="font-semibold">{order.id}</p>
-                          <p className="text-sm text-muted-foreground">{order.customer}</p>
-                          <p className="text-xs text-muted-foreground">{order.date}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {order.customer}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {order.date}
+                          </p>
                         </div>
                         <div className="text-right space-y-1">
                           {getStatusBadge(order.status)}
@@ -454,14 +547,23 @@ const AdminDashboard = () => {
                 <CardContent>
                   <div className="space-y-4">
                     {lowStockProducts.map((product, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 bg-warning/10 rounded-lg border border-warning/20">
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-3 bg-warning/10 rounded-lg border border-warning/20"
+                      >
                         <div>
                           <p className="font-semibold">{product.name}</p>
-                          <p className="text-sm text-muted-foreground">SKU: {product.sku}</p>
+                          <p className="text-sm text-muted-foreground">
+                            SKU: {product.sku}
+                          </p>
                         </div>
                         <div className="text-right">
-                          <p className="text-warning font-bold">{product.stock} left</p>
-                          <p className="text-xs text-muted-foreground">Min: {product.threshold}</p>
+                          <p className="text-warning font-bold">
+                            {product.stock} left
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Min: {product.threshold}
+                          </p>
                         </div>
                       </div>
                     ))}
@@ -479,7 +581,10 @@ const AdminDashboard = () => {
                   <div className="flex items-center gap-2">
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input placeholder="Search orders..." className="pl-10 w-64" />
+                      <Input
+                        placeholder="Search orders..."
+                        className="pl-10 w-64"
+                      />
                     </div>
                     <Button variant="outline">
                       <Filter className="h-4 w-4" />
@@ -506,7 +611,9 @@ const AdminDashboard = () => {
                         <TableCell className="font-mono">{order.id}</TableCell>
                         <TableCell>{order.customer}</TableCell>
                         <TableCell>{getStatusBadge(order.status)}</TableCell>
-                        <TableCell className="font-semibold">{order.total}</TableCell>
+                        <TableCell className="font-semibold">
+                          {order.total}
+                        </TableCell>
                         <TableCell>{order.date}</TableCell>
                         <TableCell>
                           <Button variant="outline" size="sm">
@@ -532,8 +639,8 @@ const AdminDashboard = () => {
                   <div className="flex items-center gap-2">
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input 
-                        placeholder="Search products..." 
+                      <Input
+                        placeholder="Search products..."
                         className="pl-10 w-64"
                         value={productSearch}
                         onChange={(e) => setProductSearch(e.target.value)}
@@ -576,11 +683,23 @@ const AdminDashboard = () => {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="font-mono">{product.sku}</TableCell>
+                        <TableCell className="font-mono">
+                          {product.sku}
+                        </TableCell>
                         <TableCell>{product.category}</TableCell>
-                        <TableCell className="font-semibold">${product.price}</TableCell>
+                        <TableCell className="font-semibold">
+                          ${product.price}
+                        </TableCell>
                         <TableCell>
-                          <span className={product.stock === 0 ? "text-destructive" : product.stock < 5 ? "text-warning" : ""}>
+                          <span
+                            className={
+                              product.stock === 0
+                                ? "text-destructive"
+                                : product.stock < 5
+                                ? "text-warning"
+                                : ""
+                            }
+                          >
                             {product.stock}
                           </span>
                         </TableCell>
@@ -589,7 +708,9 @@ const AdminDashboard = () => {
                           <div className="flex items-center gap-1">
                             <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                             <span className="text-sm">{product.rating}</span>
-                            <span className="text-xs text-muted-foreground">({product.reviews})</span>
+                            <span className="text-xs text-muted-foreground">
+                              ({product.reviews})
+                            </span>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -624,14 +745,17 @@ const AdminDashboard = () => {
                   <div className="flex items-center gap-2">
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input 
-                        placeholder="Search categories..." 
+                      <Input
+                        placeholder="Search categories..."
                         className="pl-10 w-64"
                         value={categorySearch}
                         onChange={(e) => setCategorySearch(e.target.value)}
                       />
                     </div>
-                    <Dialog open={isAddCategoryOpen} onOpenChange={setIsAddCategoryOpen}>
+                    <Dialog
+                      open={isAddCategoryOpen}
+                      onOpenChange={setIsAddCategoryOpen}
+                    >
                       <DialogTrigger asChild>
                         <Button variant="default">
                           <Plus className="h-4 w-4" />
@@ -648,15 +772,26 @@ const AdminDashboard = () => {
                         <div className="grid gap-4 py-4">
                           <div className="grid gap-2">
                             <Label htmlFor="categoryName">Category Name</Label>
-                            <Input id="categoryName" placeholder="Enter category name" />
+                            <Input
+                              id="categoryName"
+                              placeholder="Enter category name"
+                            />
                           </div>
                           <div className="grid gap-2">
-                            <Label htmlFor="categoryDescription">Description</Label>
-                            <Textarea id="categoryDescription" placeholder="Category description" />
+                            <Label htmlFor="categoryDescription">
+                              Description
+                            </Label>
+                            <Textarea
+                              id="categoryDescription"
+                              placeholder="Category description"
+                            />
                           </div>
                         </div>
                         <div className="flex justify-end gap-2">
-                          <Button variant="outline" onClick={() => setIsAddCategoryOpen(false)}>
+                          <Button
+                            variant="outline"
+                            onClick={() => setIsAddCategoryOpen(false)}
+                          >
                             Cancel
                           </Button>
                           <Button onClick={() => setIsAddCategoryOpen(false)}>
@@ -696,7 +831,9 @@ const AdminDashboard = () => {
                         <TableCell className="text-muted-foreground max-w-xs">
                           {category.description}
                         </TableCell>
-                        <TableCell className="text-center">{category.products}</TableCell>
+                        <TableCell className="text-center">
+                          {category.products}
+                        </TableCell>
                         <TableCell>{getStatusBadge(category.status)}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1 text-sm text-muted-foreground">
@@ -736,8 +873,8 @@ const AdminDashboard = () => {
                   <div className="flex items-center gap-2">
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input 
-                        placeholder="Search customers..." 
+                      <Input
+                        placeholder="Search customers..."
                         className="pl-10 w-64"
                         value={customerSearch}
                         onChange={(e) => setCustomerSearch(e.target.value)}
@@ -771,12 +908,17 @@ const AdminDashboard = () => {
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
                               <span className="text-sm font-medium text-primary">
-                                {customer.name.split(' ').map(n => n[0]).join('')}
+                                {customer.name
+                                  .split(" ")
+                                  .map((n) => n[0])
+                                  .join("")}
                               </span>
                             </div>
                             <div>
                               <p className="font-medium">{customer.name}</p>
-                              <p className="text-sm text-muted-foreground">{customer.email}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {customer.email}
+                              </p>
                             </div>
                           </div>
                         </TableCell>
@@ -784,16 +926,24 @@ const AdminDashboard = () => {
                           <div className="space-y-1">
                             <div className="flex items-center gap-2 text-sm">
                               <Mail className="h-3 w-3" />
-                              <span className="text-muted-foreground">{customer.email}</span>
+                              <span className="text-muted-foreground">
+                                {customer.email}
+                              </span>
                             </div>
                             <div className="flex items-center gap-2 text-sm">
                               <Phone className="h-3 w-3" />
-                              <span className="text-muted-foreground">{customer.phone}</span>
+                              <span className="text-muted-foreground">
+                                {customer.phone}
+                              </span>
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="text-center">{customer.orders}</TableCell>
-                        <TableCell className="font-semibold">${customer.totalSpent.toFixed(2)}</TableCell>
+                        <TableCell className="text-center">
+                          {customer.orders}
+                        </TableCell>
+                        <TableCell className="font-semibold">
+                          ${customer.totalSpent.toFixed(2)}
+                        </TableCell>
                         <TableCell>{getStatusBadge(customer.status)}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1 text-sm text-muted-foreground">

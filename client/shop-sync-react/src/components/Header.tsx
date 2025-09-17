@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
 
-const Header = () => {
+const Header = ({ isAdmin = false }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [cartCount] = useState(0);
   const { user, isAuthenticated, logout } = useAuth();
@@ -33,22 +33,31 @@ const Header = () => {
   const handleLogout = async () => {
     try {
       await logout();
-      navigate("/");
+      navigate(isAdmin ? "/login" : "/");
     } catch (error) {
       console.error("Logout failed:", error);
     }
   };
 
-  const navItems = [
-    { label: "Home", href: "/" },
-    { label: "Shop", href: "/shop" },
-    { label: "Electronics", href: "/category/electronics" },
-    { label: "Fashion", href: "/category/fashion" },
-    { label: "Home & Garden", href: "/category/home" },
-    { label: "Deals", href: "/deals" },
-    { label: "About", href: "/about" },
-    { label: "Contact", href: "/contact" },
-  ];
+  const navItems = isAdmin
+    ? [
+        { label: "Home", href: "/" },
+        { label: "Dashboard", href: "/admin" },
+        // { label: "Products", href: "/admin/products" },
+        // { label: "Categories", href: "/admin/categories" },
+        // { label: "Orders", href: "/admin/orders" },
+        // { label: "Customers", href: "/admin/customers" },
+      ]
+    : [
+        { label: "Home", href: "/" },
+        { label: "Shop", href: "/shop" },
+        { label: "Electronics", href: "/category/electronics" },
+        { label: "Fashion", href: "/category/fashion" },
+        { label: "Home & Garden", href: "/category/home" },
+        { label: "Deals", href: "/deals" },
+        { label: "About", href: "/about" },
+        { label: "Contact", href: "/contact" },
+      ];
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -70,7 +79,10 @@ const Header = () => {
               )}
             </Button>
 
-            <Link to="/" className="flex items-center space-x-2">
+            <Link
+              to={isAdmin ? "/admin" : "/"}
+              className="flex items-center space-x-2"
+            >
               <div className="h-8 w-8 bg-gradient-primary rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">E</span>
               </div>
