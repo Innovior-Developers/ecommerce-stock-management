@@ -35,21 +35,6 @@ services:
   #   networks:
   #     - app-network
 
-  # MongoDB
-  # mongodb:
-  #   image: mongo:7.0
-  #   restart: unless-stopped
-  #   ports:
-  #     - "27017:27017"
-  #   environment:
-  #     MONGO_INITDB_ROOT_USERNAME: root
-  #     MONGO_INITDB_ROOT_PASSWORD: password
-  #     MONGO_INITDB_DATABASE: ecommerce_stock
-  #   volumes:
-  #     - mongodb_data:/data/db
-  #   networks:
-  #     - app-network
-
   # Redis
   redis:
     image: redis:7-alpine
