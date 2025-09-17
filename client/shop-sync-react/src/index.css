@@ -1,0 +1,255 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* E-commerce Design System - Modern, professional with subtle luxury */
+@layer base {
+  :root {
+    /* Core Brand Colors */
+    --background: 0 0% 100%;
+    --foreground: 215 20% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 215 20% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 20% 15%;
+
+    /* Primary Brand - Deep Ocean Blue */
+    --primary: 217 91% 27%;
+    --primary-foreground: 0 0% 98%;
+    --primary-light: 217 91% 35%;
+    --primary-dark: 217 91% 20%;
+
+    /* Secondary - Emerald Green for success/actions */
+    --secondary: 158 64% 52%;
+    --secondary-foreground: 0 0% 98%;
+    --secondary-light: 158 64% 60%;
+    --secondary-dark: 158 64% 44%;
+
+    /* Accent - Warm Orange for highlights */
+    --accent: 25 95% 53%;
+    --accent-foreground: 0 0% 98%;
+    --accent-light: 25 95% 61%;
+
+    /* Neutrals */
+    --muted: 220 14% 96%;
+    --muted-foreground: 215 16% 47%;
+    --muted-dark: 220 14% 91%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 217 91% 27%;
+
+    --radius: 0.75rem;
+
+    /* E-commerce Specific Colors */
+    --success: 158 64% 52%;
+    --success-foreground: 0 0% 98%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 98%;
+    --info: 199 89% 48%;
+    --info-foreground: 0 0% 98%;
+
+    /* Price & Money Colors */
+    --price: 158 64% 52%;
+    --price-sale: 0 84% 60%;
+    --price-foreground: 0 0% 98%;
+
+    /* Stock Status Colors */
+    --in-stock: 158 64% 52%;
+    --low-stock: 38 92% 50%;
+    --out-of-stock: 0 84% 60%;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(217 91% 27%), hsl(217 91% 35%));
+    --gradient-secondary: linear-gradient(135deg, hsl(158 64% 52%), hsl(158 64% 60%));
+    --gradient-hero: linear-gradient(135deg, hsl(217 91% 27%) 0%, hsl(158 64% 52%) 100%);
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%) 0%, hsl(220 14% 98%) 100%);
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 hsl(215 20% 15% / 0.05);
+    --shadow-md: 0 4px 6px -1px hsl(215 20% 15% / 0.1), 0 2px 4px -1px hsl(215 20% 15% / 0.06);
+    --shadow-lg: 0 10px 15px -3px hsl(215 20% 15% / 0.1), 0 4px 6px -2px hsl(215 20% 15% / 0.05);
+    --shadow-xl: 0 20px 25px -5px hsl(215 20% 15% / 0.1), 0 10px 10px -5px hsl(215 20% 15% / 0.04);
+    --shadow-glow: 0 0 0 1px hsl(217 91% 27% / 0.05), 0 1px 0 0 hsl(217 91% 27% / 0.05), 0 0 20px 0 hsl(217 91% 27% / 0.1);
+
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+    /* Sidebar Variables */
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 215 20% 15%;
+    --foreground: 0 0% 98%;
+
+    --card: 215 20% 15%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 215 20% 15%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 217 91% 35%;
+    --primary-foreground: 0 0% 15%;
+    --primary-light: 217 91% 42%;
+    --primary-dark: 217 91% 28%;
+
+    --secondary: 158 64% 44%;
+    --secondary-foreground: 0 0% 98%;
+    --secondary-light: 158 64% 52%;
+    --secondary-dark: 158 64% 36%;
+
+    --accent: 25 95% 53%;
+    --accent-foreground: 0 0% 15%;
+    --accent-light: 25 95% 61%;
+
+    --muted: 215 20% 20%;
+    --muted-foreground: 215 16% 65%;
+    --muted-dark: 215 20% 15%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 215 20% 20%;
+    --input: 215 20% 20%;
+    --ring: 217 91% 35%;
+
+    /* E-commerce Dark Mode Colors */
+    --success: 158 64% 44%;
+    --success-foreground: 0 0% 98%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 15%;
+    --info: 199 89% 48%;
+    --info-foreground: 0 0% 98%;
+
+    --price: 158 64% 44%;
+    --price-sale: 0 84% 60%;
+    --price-foreground: 0 0% 98%;
+
+    --in-stock: 158 64% 44%;
+    --low-stock: 38 92% 50%;
+    --out-of-stock: 0 84% 60%;
+
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 3px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.3);
+  }
+}
+
+@layer components {
+  /* Hero Section Styles */
+  .hero-gradient {
+    background: var(--gradient-hero);
+  }
+  
+  .card-gradient {
+    background: var(--gradient-card);
+  }
+  
+  /* Product Card Animations */
+  .product-card {
+    @apply transition-all duration-300 ease-in-out;
+    box-shadow: var(--shadow-sm);
+  }
+  
+  .product-card:hover {
+    @apply -translate-y-1;
+    box-shadow: var(--shadow-lg);
+  }
+  
+  /* Button Animations */
+  .btn-hover {
+    @apply transition-all duration-200 ease-in-out transform hover:scale-105;
+  }
+  
+  /* Price Display */
+  .price-current {
+    @apply text-lg font-bold;
+    color: hsl(var(--price));
+  }
+  
+  .price-original {
+    @apply text-sm line-through;
+    color: hsl(var(--muted-foreground));
+  }
+  
+  .price-sale {
+    @apply text-lg font-bold;
+    color: hsl(var(--price-sale));
+  }
+  
+  /* Stock Status Badges */
+  .stock-in {
+    @apply px-2 py-1 rounded text-xs font-medium;
+    background-color: hsl(var(--in-stock) / 0.1);
+    color: hsl(var(--in-stock));
+  }
+  
+  .stock-low {
+    @apply px-2 py-1 rounded text-xs font-medium;
+    background-color: hsl(var(--low-stock) / 0.1);
+    color: hsl(var(--low-stock));
+  }
+  
+  .stock-out {
+    @apply px-2 py-1 rounded text-xs font-medium;
+    background-color: hsl(var(--out-of-stock) / 0.1);
+    color: hsl(var(--out-of-stock));
+  }
+  
+  /* Loading States */
+  .shimmer {
+    @apply animate-pulse bg-gradient-to-r from-muted via-muted-dark to-muted;
+  }
+  
+  /* Focus States */
+  .focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2;
+  }
+}
