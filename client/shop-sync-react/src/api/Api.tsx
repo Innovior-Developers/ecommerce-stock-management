@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
 import { API_CONFIG } from "./config";
 
@@ -108,26 +109,33 @@ class ApiService {
   }
 
   private handleError(error: unknown): ApiError {
-    if (error.response) {
-      // Server responded with error status
-      return {
-        success: false,
-        message: error.response.data?.message || "An error occurred",
-        errors: error.response.data?.errors,
-      };
-    } else if (error.request) {
-      // Network error
-      return {
-        success: false,
-        message: "Network error. Please check your connection.",
-      };
-    } else {
-      // Other error
-      return {
-        success: false,
-        message: error.message || "An unexpected error occurred",
-      };
+    console.error("API Error:", error);
+
+    if (axios.isAxiosError(error)) {
+      if (error.response) {
+        // Server responded with error status
+        return {
+          success: false,
+          message:
+            error.response.data?.message ||
+            `Server error: ${error.response.status}`,
+          errors: error.response.data?.errors,
+        };
+      } else if (error.request) {
+        // Network error
+        return {
+          success: false,
+          message:
+            "Network error. Please check your connection and ensure the backend server is running.",
+        };
+      }
     }
+
+    return {
+      success: false,
+      message:
+        error instanceof Error ? error.message : "An unexpected error occurred",
+    };
   }
 
   // Health check method
@@ -136,5 +144,79 @@ class ApiService {
   }
 }
 
+// Products API
+export async function getAdminProducts(params?: unknown) {
+  return apiService.get(API_ENDPOINTS.ADMIN.PRODUCTS, { params });
+}
+
+export async function createAdminProduct(data: unknown) {
+  return apiService.post(API_ENDPOINTS.ADMIN.PRODUCTS, data);
+}
+
+export async function updateAdminProduct(id: string, data: unknown) {
+  return apiService.put(`${API_ENDPOINTS.ADMIN.PRODUCTS}/${id}`, data);
+}
+
+export async function deleteAdminProduct(id: string) {
+  return apiService.delete(`${API_ENDPOINTS.ADMIN.PRODUCTS}/${id}`);
+}
+
+// Categories API
+export async function getAdminCategories(params?: unknown) {
+  return apiService.get(API_ENDPOINTS.ADMIN.CATEGORIES, { params });
+}
+
+export async function createAdminCategory(data: unknown) {
+  return apiService.post(API_ENDPOINTS.ADMIN.CATEGORIES, data);
+}
+
+export async function updateAdminCategory(id: string, data: unknown) {
+  return apiService.put(`${API_ENDPOINTS.ADMIN.CATEGORIES}/${id}`, data);
+}
+
+export async function deleteAdminCategory(id: string) {
+  return apiService.delete(`${API_ENDPOINTS.ADMIN.CATEGORIES}/${id}`);
+}
+
+// Customers API
+export async function getAdminCustomers(params?: unknown) {
+  return apiService.get(API_ENDPOINTS.ADMIN.CUSTOMERS, { params });
+}
+
+export async function updateAdminCustomer(id: string, data: unknown) {
+  return apiService.put(`${API_ENDPOINTS.ADMIN.CUSTOMERS}/${id}`, data);
+}
+
+export async function deleteAdminCustomer(id: string) {
+  return apiService.delete(`${API_ENDPOINTS.ADMIN.CUSTOMERS}/${id}`);
+}
+
+// Orders API
+export async function getAdminOrders(params?: unknown) {
+  return apiService.get(API_ENDPOINTS.ADMIN.ORDERS, { params });
+}
+
+export async function updateAdminOrder(id: string, data: unknown) {
+  return apiService.put(`${API_ENDPOINTS.ADMIN.ORDERS}/${id}`, data);
+}
+
+export async function deleteAdminOrder(id: string) {
+  return apiService.delete(`${API_ENDPOINTS.ADMIN.ORDERS}/${id}`);
+}
+
+// Inventory API
+export async function getStockLevels() {
+  return apiService.get(`${API_ENDPOINTS.ADMIN.INVENTORY}/stock-levels`);
+}
+
+export async function getLowStock() {
+  return apiService.get(`${API_ENDPOINTS.ADMIN.INVENTORY}/low-stock`);
+}
+
+export async function updateStock(id: string, data: unknown) {
+  return apiService.put(`${API_ENDPOINTS.ADMIN.INVENTORY}/${id}`, data);
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
 export const apiService = new ApiService();
 export default ApiService;

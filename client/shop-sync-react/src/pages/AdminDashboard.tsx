@@ -1,4 +1,22 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  getAdminProducts,
+  createAdminProduct,
+  updateAdminProduct,
+  deleteAdminProduct,
+  getAdminCategories,
+  createAdminCategory,
+  updateAdminCategory,
+  deleteAdminCategory,
+  getAdminCustomers,
+  updateAdminCustomer,
+  deleteAdminCustomer,
+  getAdminOrders,
+  updateAdminOrder,
+  getLowStock,
+  getStockLevels,
+} from "@/api/Api";
 import {
   Package,
   ShoppingCart,
@@ -51,328 +69,216 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import Header from "@/components/Header";
-
-// Mock data
-const dashboardStats = [
-  {
-    title: "Total Revenue",
-    value: "$45,231",
-    change: "+20.1%",
-    trend: "up",
-    icon: DollarSign,
-    color: "text-green-600",
-  },
-  {
-    title: "Orders",
-    value: "1,234",
-    change: "+15.3%",
-    trend: "up",
-    icon: ShoppingCart,
-    color: "text-blue-600",
-  },
-  {
-    title: "Customers",
-    value: "8,759",
-    change: "+12.5%",
-    trend: "up",
-    icon: Users,
-    color: "text-purple-600",
-  },
-  {
-    title: "Products",
-    value: "892",
-    change: "+5.2%",
-    trend: "up",
-    icon: Package,
-    color: "text-orange-600",
-  },
-];
-
-const recentOrders = [
-  {
-    id: "#1234",
-    customer: "John Doe",
-    status: "Fulfilled",
-    total: "$299.99",
-    date: "2024-01-15",
-  },
-  {
-    id: "#1235",
-    customer: "Jane Smith",
-    status: "Pending",
-    total: "$899.99",
-    date: "2024-01-15",
-  },
-  {
-    id: "#1236",
-    customer: "Bob Johnson",
-    status: "Shipped",
-    total: "$149.99",
-    date: "2024-01-14",
-  },
-  {
-    id: "#1237",
-    customer: "Alice Brown",
-    status: "Delivered",
-    total: "$599.99",
-    date: "2024-01-14",
-  },
-  {
-    id: "#1238",
-    customer: "Charlie Wilson",
-    status: "Cancelled",
-    total: "$79.99",
-    date: "2024-01-13",
-  },
-];
-
-const lowStockProducts = [
-  { name: "Premium Headphones", sku: "PH001", stock: 3, threshold: 10 },
-  { name: "Smart Watch", sku: "SW002", stock: 1, threshold: 5 },
-  { name: "Leather Briefcase", sku: "LB003", stock: 2, threshold: 8 },
-];
-
-// Mock products data
-const productsData = [
-  {
-    id: "1",
-    name: "Premium Wireless Headphones",
-    sku: "PH001",
-    category: "Electronics",
-    price: 299.99,
-    stock: 15,
-    status: "Active",
-    image: "/src/assets/product-headphones.jpg",
-    description: "High-quality wireless headphones with noise cancellation",
-    rating: 4.8,
-    reviews: 124,
-  },
-  {
-    id: "2",
-    name: "Smart Fitness Watch",
-    sku: "SW002",
-    category: "Electronics",
-    price: 199.99,
-    stock: 8,
-    status: "Active",
-    image: "/src/assets/product-watch.jpg",
-    description: "Advanced fitness tracking with heart rate monitor",
-    rating: 4.6,
-    reviews: 89,
-  },
-  {
-    id: "3",
-    name: "Luxury Leather Bag",
-    sku: "LB003",
-    category: "Fashion",
-    price: 159.99,
-    stock: 3,
-    status: "Low Stock",
-    image: "/src/assets/product-bag.jpg",
-    description: "Handcrafted genuine leather bag for professionals",
-    rating: 4.9,
-    reviews: 67,
-  },
-  {
-    id: "4",
-    name: "Wireless Earbuds Pro",
-    sku: "WE004",
-    category: "Electronics",
-    price: 179.99,
-    stock: 0,
-    status: "Out of Stock",
-    image: "/src/assets/product-headphones.jpg",
-    description: "Premium wireless earbuds with active noise cancellation",
-    rating: 4.7,
-    reviews: 156,
-  },
-];
-
-// Mock customers data
-const customersData = [
-  {
-    id: "1",
-    name: "John Doe",
-    email: "john.doe@example.com",
-    phone: "+1 (555) 123-4567",
-    address: "123 Main St, New York, NY 10001",
-    orders: 8,
-    totalSpent: 2456.78,
-    status: "Active",
-    joinDate: "2023-03-15",
-    lastOrder: "2024-01-15",
-  },
-  {
-    id: "2",
-    name: "Jane Smith",
-    email: "jane.smith@example.com",
-    phone: "+1 (555) 987-6543",
-    address: "456 Oak Ave, Los Angeles, CA 90001",
-    orders: 12,
-    totalSpent: 3892.45,
-    status: "VIP",
-    joinDate: "2022-11-20",
-    lastOrder: "2024-01-14",
-  },
-  {
-    id: "3",
-    name: "Bob Johnson",
-    email: "bob.johnson@example.com",
-    phone: "+1 (555) 456-7890",
-    address: "789 Pine St, Chicago, IL 60601",
-    orders: 3,
-    totalSpent: 567.23,
-    status: "Active",
-    joinDate: "2023-12-05",
-    lastOrder: "2024-01-12",
-  },
-  {
-    id: "4",
-    name: "Alice Brown",
-    email: "alice.brown@example.com",
-    phone: "+1 (555) 321-0987",
-    address: "321 Elm Dr, Houston, TX 77001",
-    orders: 15,
-    totalSpent: 4123.89,
-    status: "VIP",
-    joinDate: "2022-08-10",
-    lastOrder: "2024-01-13",
-  },
-  {
-    id: "5",
-    name: "Charlie Wilson",
-    email: "charlie.wilson@example.com",
-    phone: "+1 (555) 654-3210",
-    address: "654 Maple Ln, Miami, FL 33101",
-    orders: 1,
-    totalSpent: 89.99,
-    status: "New",
-    joinDate: "2024-01-01",
-    lastOrder: "2024-01-05",
-  },
-];
-
-// Mock categories data
-const categoriesData = [
-  {
-    id: "1",
-    name: "Electronics",
-    description: "Electronic devices and gadgets",
-    products: 45,
-    status: "Active",
-    createdDate: "2023-01-15",
-  },
-  {
-    id: "2",
-    name: "Fashion",
-    description: "Clothing, accessories, and fashion items",
-    products: 67,
-    status: "Active",
-    createdDate: "2023-02-20",
-  },
-  {
-    id: "3",
-    name: "Home & Garden",
-    description: "Home decor and gardening supplies",
-    products: 23,
-    status: "Active",
-    createdDate: "2023-03-10",
-  },
-  {
-    id: "4",
-    name: "Sports & Outdoors",
-    description: "Sports equipment and outdoor gear",
-    products: 21,
-    status: "Active",
-    createdDate: "2023-04-05",
-  },
-];
+import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
-  const [isEditProductOpen, setIsEditProductOpen] = useState(false);
   const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<unknown>(null);
+
+  // Search states
   const [productSearch, setProductSearch] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
   const [categorySearch, setCategorySearch] = useState("");
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      Pending: {
-        variant: "secondary" as const,
-        className: "bg-yellow-100 text-yellow-800",
-      },
-      Fulfilled: {
-        variant: "secondary" as const,
-        className: "bg-green-100 text-green-800",
-      },
-      Shipped: {
-        variant: "secondary" as const,
-        className: "bg-blue-100 text-blue-800",
-      },
-      Delivered: {
-        variant: "secondary" as const,
-        className: "bg-emerald-100 text-emerald-800",
-      },
-      Cancelled: {
-        variant: "destructive" as const,
-        className: "bg-red-100 text-red-800",
-      },
-      Active: {
-        variant: "secondary" as const,
-        className: "bg-green-100 text-green-800",
-      },
-      "Low Stock": {
-        variant: "secondary" as const,
-        className: "bg-yellow-100 text-yellow-800",
-      },
-      "Out of Stock": {
-        variant: "destructive" as const,
-        className: "bg-red-100 text-red-800",
-      },
-      VIP: {
-        variant: "secondary" as const,
-        className: "bg-purple-100 text-purple-800",
-      },
-      New: {
-        variant: "secondary" as const,
-        className: "bg-blue-100 text-blue-800",
-      },
+  const queryClient = useQueryClient();
+
+  // Products queries and mutations
+  const { data: productsResponse, isLoading: productsLoading } = useQuery({
+    queryKey: ["admin-products", productSearch],
+    queryFn: () => getAdminProducts({ search: productSearch }),
+  });
+
+  const { data: categoriesResponse, isLoading: categoriesLoading } = useQuery({
+    queryKey: ["admin-categories", categorySearch],
+    queryFn: () => getAdminCategories({ search: categorySearch }),
+  });
+
+  const { data: customersResponse, isLoading: customersLoading } = useQuery({
+    queryKey: ["admin-customers", customerSearch],
+    queryFn: () => getAdminCustomers({ search: customerSearch }),
+  });
+
+  const { data: ordersResponse, isLoading: ordersLoading } = useQuery({
+    queryKey: ["admin-orders"],
+    queryFn: () => getAdminOrders(),
+  });
+
+  const { data: lowStockResponse } = useQuery({
+    queryKey: ["low-stock"],
+    queryFn: () => getLowStock(),
+  });
+
+  // Mutations
+  const createProductMutation = useMutation({
+    mutationFn: createAdminProduct,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-products"] });
+      setIsAddProductOpen(false);
+      toast.success("Product created successfully!");
+    },
+    onError: (error: unknown) => {
+      toast.error(error.message || "Failed to create product");
+    },
+  });
+
+  const createCategoryMutation = useMutation({
+    mutationFn: createAdminCategory,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-categories"] });
+      setIsAddCategoryOpen(false);
+    },
+  });
+
+  const deleteProductMutation = useMutation({
+    mutationFn: deleteAdminProduct,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-products"] });
+    },
+  });
+
+  const deleteCategoryMutation = useMutation({
+    mutationFn: deleteAdminCategory,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-categories"] });
+    },
+  });
+
+  // Extract data from API responses
+  const products = productsResponse?.data?.data || [];
+  const categories = categoriesResponse?.data || [];
+  const customers = customersResponse?.data?.data || [];
+  const orders = ordersResponse?.data || [];
+  const lowStockProducts = lowStockResponse?.data || [];
+
+  // Calculate dashboard stats from real data
+  const dashboardStats = [
+    {
+      title: "Total Products",
+      value: products.length.toString(),
+      change: "+5.2%",
+      trend: "up",
+      icon: Package,
+      color: "text-orange-600",
+    },
+    {
+      title: "Categories",
+      value: categories.length.toString(),
+      change: "+2.1%",
+      trend: "up",
+      icon: Tag,
+      color: "text-blue-600",
+    },
+    {
+      title: "Customers",
+      value: customers.length.toString(),
+      change: "+12.5%",
+      trend: "up",
+      icon: Users,
+      color: "text-purple-600",
+    },
+    {
+      title: "Total Orders",
+      value: orders.length.toString(),
+      change: "+15.3%",
+      trend: "up",
+      icon: ShoppingCart,
+      color: "text-green-600",
+    },
+  ];
+
+  // Filter functions
+  const filteredProducts = products.filter(
+    (product: unknown) =>
+      product.name?.toLowerCase().includes(productSearch.toLowerCase()) ||
+      product.sku?.toLowerCase().includes(productSearch.toLowerCase()) ||
+      product.category?.toLowerCase().includes(productSearch.toLowerCase())
+  );
+
+  const filteredCustomers = customers.filter(
+    (customer: unknown) =>
+      customer.user?.name
+        ?.toLowerCase()
+        .includes(customerSearch.toLowerCase()) ||
+      customer.user?.email?.toLowerCase().includes(customerSearch.toLowerCase())
+  );
+
+  const filteredCategories = categories.filter(
+    (category: unknown) =>
+      category.name?.toLowerCase().includes(categorySearch.toLowerCase()) ||
+      category.description?.toLowerCase().includes(categorySearch.toLowerCase())
+  );
+
+  const handleDeleteProduct = (id: string) => {
+    if (confirm("Are you sure you want to delete this product?")) {
+      deleteProductMutation.mutate(id);
+    }
+  };
+
+  const handleDeleteCategory = (id: string) => {
+    if (confirm("Are you sure you want to delete this category?")) {
+      deleteCategoryMutation.mutate(id);
+    }
+  };
+
+  const handleCreateProduct = (formData: FormData) => {
+    const productData = {
+      name: formData.get("name"),
+      sku: formData.get("sku"),
+      category: formData.get("category"),
+      price: parseFloat(formData.get("price") as string),
+      stock_quantity: parseInt(formData.get("stock") as string),
+      description: formData.get("description"),
+      status: "active",
     };
 
-    const config = statusConfig[status as keyof typeof statusConfig] || {
-      variant: "secondary" as const,
-      className: "",
+    createProductMutation.mutate(productData);
+  };
+
+  const handleCreateCategory = (formData: FormData) => {
+    const categoryData = {
+      name: formData.get("name"),
+      description: formData.get("description"),
+      status: "active",
+      sort_order: 0,
+    };
+
+    createCategoryMutation.mutate(categoryData);
+  };
+
+  // Use real orders data instead of mock data
+  const recentOrders = orders.slice(0, 5).map((order: unknown) => ({
+    id: order._id || order.id,
+    customer:
+      order.customer?.user?.name || order.customer_name || "Unknown Customer",
+    status: order.status,
+    total: `$${order.total}`,
+    date: new Date(order.created_at).toLocaleDateString(),
+  }));
+
+  // Add helper function for status badges
+  const getStatusBadge = (status: string) => {
+    const statusMap = {
+      delivered: { variant: "default", color: "text-green-600" },
+      processing: { variant: "secondary", color: "text-blue-600" },
+      shipped: { variant: "outline", color: "text-orange-600" },
+      pending: { variant: "destructive", color: "text-red-600" },
+      active: { variant: "default", color: "text-green-600" },
+      inactive: { variant: "secondary", color: "text-gray-600" },
+    };
+
+    const config = statusMap[status] || {
+      variant: "secondary",
+      color: "text-gray-600",
     };
 
     return (
-      <Badge variant={config.variant} className={config.className}>
-        {status}
+      <Badge variant={config.variant as unknown} className={config.color}>
+        {status.charAt(0).toUpperCase() + status.slice(1)}
       </Badge>
     );
   };
-
-  const filteredProducts = productsData.filter(
-    (product) =>
-      product.name.toLowerCase().includes(productSearch.toLowerCase()) ||
-      product.sku.toLowerCase().includes(productSearch.toLowerCase()) ||
-      product.category.toLowerCase().includes(productSearch.toLowerCase())
-  );
-
-  const filteredCustomers = customersData.filter(
-    (customer) =>
-      customer.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
-      customer.email.toLowerCase().includes(customerSearch.toLowerCase()) ||
-      customer.status.toLowerCase().includes(customerSearch.toLowerCase())
-  );
-
-  const filteredCategories = categoriesData.filter(
-    (category) =>
-      category.name.toLowerCase().includes(categorySearch.toLowerCase()) ||
-      category.description.toLowerCase().includes(categorySearch.toLowerCase())
-  );
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -399,65 +305,105 @@ const AdminDashboard = () => {
                     Add Product
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-md">
+                <DialogContent className="sm:max-w-[600px]">
                   <DialogHeader>
                     <DialogTitle>Add New Product</DialogTitle>
                     <DialogDescription>
                       Create a new product for your store.
                     </DialogDescription>
                   </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="name">Product Name</Label>
-                      <Input id="name" placeholder="Enter product name" />
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const formData = new FormData(e.target as HTMLFormElement);
+                      handleCreateProduct(formData);
+                    }}
+                    className="space-y-4"
+                  >
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="productName">Product Name</Label>
+                        <Input
+                          id="productName"
+                          name="name"
+                          placeholder="Enter product name"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="productSku">SKU</Label>
+                        <Input
+                          id="productSku"
+                          name="sku"
+                          placeholder="Enter SKU"
+                          required
+                        />
+                      </div>
                     </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="sku">SKU</Label>
-                      <Input id="sku" placeholder="Enter SKU" />
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="productPrice">Price</Label>
+                        <Input
+                          id="productPrice"
+                          name="price"
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="productStock">Stock Quantity</Label>
+                        <Input
+                          id="productStock"
+                          name="stock"
+                          type="number"
+                          placeholder="0"
+                          required
+                        />
+                      </div>
                     </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="category">Category</Label>
-                      <Select>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="productCategory">Category</Label>
+                      <Select name="category" required>
                         <SelectTrigger>
                           <SelectValue placeholder="Select category" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="electronics">
-                            Electronics
-                          </SelectItem>
-                          <SelectItem value="fashion">Fashion</SelectItem>
-                          <SelectItem value="home">Home & Garden</SelectItem>
-                          <SelectItem value="sports">Sports</SelectItem>
+                          {categories.map((category: unknown) => (
+                            <SelectItem key={category._id} value={category.name}>
+                              {category.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="price">Price</Label>
-                      <Input id="price" type="number" placeholder="0.00" />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="stock">Stock Quantity</Label>
-                      <Input id="stock" type="number" placeholder="0" />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="description">Description</Label>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="productDescription">Description</Label>
                       <Textarea
-                        id="description"
+                        id="productDescription"
+                        name="description"
                         placeholder="Product description"
+                        rows={3}
                       />
                     </div>
-                  </div>
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => setIsAddProductOpen(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button onClick={() => setIsAddProductOpen(false)}>
-                      Add Product
-                    </Button>
-                  </div>
+
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsAddProductOpen(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button type="submit" disabled={createProductMutation.isPending}>
+                        {createProductMutation.isPending ? "Adding..." : "Add Product"}
+                      </Button>
+                    </div>
+                  </form>
                 </DialogContent>
               </Dialog>
             </div>
@@ -512,26 +458,37 @@ const AdminDashboard = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {recentOrders.slice(0, 5).map((order) => (
-                      <div
-                        key={order.id}
-                        className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
-                      >
-                        <div>
-                          <p className="font-semibold">{order.id}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {order.customer}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {order.date}
-                          </p>
-                        </div>
-                        <div className="text-right space-y-1">
-                          {getStatusBadge(order.status)}
-                          <p className="text-sm font-medium">{order.total}</p>
-                        </div>
+                    {ordersLoading ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="h-4 w-4 animate-spin" />
                       </div>
-                    ))}
+                    ) : (
+                      orders.slice(0, 5).map((order: unknown) => (
+                        <div
+                          key={order._id}
+                          className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                        >
+                          <div>
+                            <p className="font-medium">{order.order_number}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {new Date(order.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-medium">${order.total}</p>
+                            <Badge
+                              variant={
+                                order.status === "delivered"
+                                  ? "default"
+                                  : "secondary"
+                              }
+                            >
+                              {order.status}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))
+                   ) }
                   </div>
                 </CardContent>
               </Card>
@@ -654,82 +611,92 @@ const AdminDashboard = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Product</TableHead>
-                      <TableHead>SKU</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Price</TableHead>
-                      <TableHead>Stock</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Rating</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredProducts.map((product) => (
-                      <TableRow key={product.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-muted rounded-md flex items-center justify-center">
-                              <Package className="h-5 w-5 text-muted-foreground" />
-                            </div>
-                            <div>
-                              <p className="font-medium">{product.name}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {product.description.substring(0, 30)}...
-                              </p>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-mono">
-                          {product.sku}
-                        </TableCell>
-                        <TableCell>{product.category}</TableCell>
-                        <TableCell className="font-semibold">
-                          ${product.price}
-                        </TableCell>
-                        <TableCell>
-                          <span
-                            className={
-                              product.stock === 0
-                                ? "text-destructive"
-                                : product.stock < 5
-                                ? "text-warning"
-                                : ""
-                            }
-                          >
-                            {product.stock}
-                          </span>
-                        </TableCell>
-                        <TableCell>{getStatusBadge(product.status)}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                            <span className="text-sm">{product.rating}</span>
-                            <span className="text-xs text-muted-foreground">
-                              ({product.reviews})
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button variant="outline" size="sm">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button variant="outline" size="sm">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
+                {productsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Product</TableHead>
+                        <TableHead>SKU</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Price</TableHead>
+                        <TableHead>Stock</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredProducts.map((product: unknown) => (
+                        <TableRow key={product._id}>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-muted rounded-md flex items-center justify-center">
+                                <Package className="h-5 w-5 text-muted-foreground" />
+                              </div>
+                              <div>
+                                <p className="font-medium">{product.name}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {product.description?.substring(0, 30)}...
+                                </p>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="font-mono">
+                            {product.sku}
+                          </TableCell>
+                          <TableCell>{product.category}</TableCell>
+                          <TableCell className="font-semibold">
+                            ${product.price}
+                          </TableCell>
+                          <TableCell>
+                            <span
+                              className={
+                                product.stock_quantity === 0
+                                  ? "text-destructive"
+                                  : product.stock_quantity < 5
+                                  ? "text-warning"
+                                  : ""
+                              }
+                            >
+                              {product.stock_quantity}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                product.status === "active"
+                                  ? "default"
+                                  : "secondary"
+                              }
+                            >
+                              {product.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Button variant="outline" size="sm">
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button variant="outline" size="sm">
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDeleteProduct(product._id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -766,38 +733,58 @@ const AdminDashboard = () => {
                         <DialogHeader>
                           <DialogTitle>Add New Category</DialogTitle>
                           <DialogDescription>
-                            Create a new product category for your store.
+                            Create a new product category.
                           </DialogDescription>
                         </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                          <div className="grid gap-2">
+                        <form
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            const formData = new FormData(e.target as HTMLFormElement);
+                            handleCreateCategory(formData);
+                          }}
+                          className="space-y-4"
+                        >
+                          <div className="space-y-2">
                             <Label htmlFor="categoryName">Category Name</Label>
                             <Input
                               id="categoryName"
+                              name="name"
                               placeholder="Enter category name"
+                              required
                             />
                           </div>
-                          <div className="grid gap-2">
-                            <Label htmlFor="categoryDescription">
-                              Description
-                            </Label>
+                          <div className="space-y-2">
+                            <Label htmlFor="categoryDescription">Description</Label>
                             <Textarea
                               id="categoryDescription"
+                              name="description"
                               placeholder="Category description"
+                              rows={3}
                             />
                           </div>
-                        </div>
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            onClick={() => setIsAddCategoryOpen(false)}
-                          >
-                            Cancel
-                          </Button>
-                          <Button onClick={() => setIsAddCategoryOpen(false)}>
-                            Add Category
-                          </Button>
-                        </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="categorySortOrder">Sort Order</Label>
+                            <Input
+                              id="categorySortOrder"
+                              name="sort_order"
+                              type="number"
+                              placeholder="0"
+                              defaultValue="0"
+                            />
+                          </div>
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setIsAddCategoryOpen(false)}
+                            >
+                              Cancel
+                            </Button>
+                            <Button type="submit" disabled={createCategoryMutation.isPending}>
+                              {createCategoryMutation.isPending ? "Adding..." : "Add Category"}
+                            </Button>
+                          </div>
+                        </form>
                       </DialogContent>
                     </Dialog>
                   </div>

@@ -28,6 +28,8 @@ export const API_ENDPOINTS = {
     CUSTOMERS: "/admin/customers",
     ORDERS: "/admin/orders",
     INVENTORY: "/admin/inventory",
+    STOCK_LEVELS: "/admin/inventory/stock-levels",
+    LOW_STOCK: "/admin/inventory/low-stock",
   },
   HEALTH: "/health",
 } as const;
