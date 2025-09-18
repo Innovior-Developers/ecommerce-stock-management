@@ -10,33 +10,28 @@ import {
   updateAdminCategory,
   deleteAdminCategory,
   getAdminCustomers,
-  updateAdminCustomer,
-  deleteAdminCustomer,
   getAdminOrders,
-  updateAdminOrder,
   getLowStock,
   getStockLevels,
+  updateStock,
 } from "@/api/Api";
 import {
   Package,
   ShoppingCart,
   Users,
-  DollarSign,
   TrendingUp,
   AlertTriangle,
   Plus,
   Search,
   Filter,
-  Edit,
-  Trash2,
+  Tag,
+  BarChart3,
+  Loader2,
   Eye,
+  Edit,
   Mail,
   Phone,
-  MapPin,
   Calendar,
-  Star,
-  Tag,
-  Folder,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -51,31 +46,34 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import Header from "@/components/Header";
-import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+
+// Import the form components
+import {
+  ProductForm,
+  ProductCard,
+} from "@/components/admin forms/Product.form";
+import {
+  CategoryForm,
+  CategoryCard,
+} from "@/components/admin forms/Category.form";
+import { InventoryUpdateForm } from "@/components/admin forms/Inventory.form";
+import { DebugPanel } from "@/components/DebugPanel";
+import { TokenDebug } from "@/components/TokenDebug";
 
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
+
+  // Form states
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
+  const [isEditProductOpen, setIsEditProductOpen] = useState(false);
   const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
+  const [isEditCategoryOpen, setIsEditCategoryOpen] = useState(false);
+
+  // Selected items for editing
+  const [selectedProduct, setSelectedProduct] = useState<unknown>(null);
+  const [selectedCategory, setSelectedCategory] = useState<unknown>(null);
 
   // Search states
   const [productSearch, setProductSearch] = useState("");
@@ -84,50 +82,115 @@ const AdminDashboard = () => {
 
   const queryClient = useQueryClient();
 
-  // Products queries and mutations
-  const { data: productsResponse, isLoading: productsLoading } = useQuery({
+  // Queries with better error handling
+  const {
+    data: productsResponse,
+    isLoading: productsLoading,
+    error: productsError,
+  } = useQuery({
     queryKey: ["admin-products", productSearch],
     queryFn: () => getAdminProducts({ search: productSearch }),
+    retry: 2,
+    retryDelay: 1000,
   });
 
-  const { data: categoriesResponse, isLoading: categoriesLoading } = useQuery({
+  const {
+    data: categoriesResponse,
+    isLoading: categoriesLoading,
+    error: categoriesError,
+  } = useQuery({
     queryKey: ["admin-categories", categorySearch],
     queryFn: () => getAdminCategories({ search: categorySearch }),
+    retry: 2,
+    retryDelay: 1000,
   });
 
-  const { data: customersResponse, isLoading: customersLoading } = useQuery({
+  const {
+    data: customersResponse,
+    isLoading: customersLoading,
+    error: customersError,
+  } = useQuery({
     queryKey: ["admin-customers", customerSearch],
     queryFn: () => getAdminCustomers({ search: customerSearch }),
+    retry: 2,
+    retryDelay: 1000,
   });
 
-  const { data: ordersResponse, isLoading: ordersLoading } = useQuery({
+  const {
+    data: ordersResponse,
+    isLoading: ordersLoading,
+    error: ordersError,
+  } = useQuery({
     queryKey: ["admin-orders"],
     queryFn: () => getAdminOrders(),
+    retry: 2,
+    retryDelay: 1000,
   });
 
-  const { data: lowStockResponse } = useQuery({
+  const { data: lowStockResponse, error: lowStockError } = useQuery({
     queryKey: ["low-stock"],
     queryFn: () => getLowStock(),
+    retry: 2,
+    retryDelay: 1000,
   });
 
-  // Mutations
+  const {
+    data: stockLevelsResponse,
+    isLoading: stockLevelsLoading,
+    error: stockLevelsError,
+  } = useQuery({
+    queryKey: ["stock-levels"],
+    queryFn: () => getStockLevels(),
+    retry: 2,
+    retryDelay: 1000,
+  });
+
+  // Show errors to user
+  if (productsError) {
+    console.error("Products Error:", productsError);
+    toast.error(`Failed to load products: ${productsError.message}`);
+  }
+  if (categoriesError) {
+    console.error("Categories Error:", categoriesError);
+    toast.error(`Failed to load categories: ${categoriesError.message}`);
+  }
+  if (customersError) {
+    console.error("Customers Error:", customersError);
+    toast.error(`Failed to load customers: ${customersError.message}`);
+  }
+  if (ordersError) {
+    console.error("Orders Error:", ordersError);
+    toast.error(`Failed to load orders: ${ordersError.message}`);
+  }
+
+  // Product mutations
   const createProductMutation = useMutation({
     mutationFn: createAdminProduct,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-products"] });
+      queryClient.invalidateQueries({ queryKey: ["stock-levels"] });
       setIsAddProductOpen(false);
       toast.success("Product created successfully!");
     },
     onError: (error: unknown) => {
+      console.error("Create product error:", error);
       toast.error(error.message || "Failed to create product");
     },
   });
 
-  const createCategoryMutation = useMutation({
-    mutationFn: createAdminCategory,
+  const updateProductMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: unknown }) =>
+      updateAdminProduct(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-categories"] });
-      setIsAddCategoryOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["admin-products"] });
+      queryClient.invalidateQueries({ queryKey: ["stock-levels"] });
+      setIsEditProductOpen(false);
+      setSelectedProduct(null);
+      toast.success("Product updated successfully!");
+    },
+    onError: (error: unknown) => {
+      console.error("Update product error:", error);
+      toast.error(error.message || "Failed to update product");
     },
   });
 
@@ -135,6 +198,41 @@ const AdminDashboard = () => {
     mutationFn: deleteAdminProduct,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-products"] });
+      queryClient.invalidateQueries({ queryKey: ["stock-levels"] });
+      toast.success("Product deleted successfully!");
+    },
+    onError: (error: unknown) => {
+      console.error("Delete product error:", error);
+      toast.error(error.message || "Failed to delete product");
+    },
+  });
+
+  // Category mutations
+  const createCategoryMutation = useMutation({
+    mutationFn: createAdminCategory,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-categories"] });
+      setIsAddCategoryOpen(false);
+      toast.success("Category created successfully!");
+    },
+    onError: (error: unknown) => {
+      console.error("Create category error:", error);
+      toast.error(error.message || "Failed to create category");
+    },
+  });
+
+  const updateCategoryMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: unknown }) =>
+      updateAdminCategory(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-categories"] });
+      setIsEditCategoryOpen(false);
+      setSelectedCategory(null);
+      toast.success("Category updated successfully!");
+    },
+    onError: (error: unknown) => {
+      console.error("Update category error:", error);
+      toast.error(error.message || "Failed to update category");
     },
   });
 
@@ -142,17 +240,60 @@ const AdminDashboard = () => {
     mutationFn: deleteAdminCategory,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-categories"] });
+      toast.success("Category deleted successfully!");
+    },
+    onError: (error: unknown) => {
+      console.error("Delete category error:", error);
+      toast.error(error.message || "Failed to delete category");
     },
   });
 
-  // Extract data from API responses
-  const products = productsResponse?.data?.data || [];
-  const categories = categoriesResponse?.data || [];
-  const customers = customersResponse?.data?.data || [];
-  const orders = ordersResponse?.data || [];
-  const lowStockProducts = lowStockResponse?.data || [];
+  // Stock update mutation
+  const updateStockMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: unknown }) =>
+      updateStock(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-products"] });
+      queryClient.invalidateQueries({ queryKey: ["stock-levels"] });
+      queryClient.invalidateQueries({ queryKey: ["low-stock"] });
+      toast.success("Stock updated successfully!");
+    },
+    onError: (error: unknown) => {
+      console.error("Update stock error:", error);
+      toast.error(error.message || "Failed to update stock");
+    },
+  });
 
-  // Calculate dashboard stats from real data
+  // Extract data with proper fallbacks and logging
+  console.log("Raw API Responses:", {
+    productsResponse,
+    categoriesResponse,
+    customersResponse,
+    ordersResponse,
+    lowStockResponse,
+    stockLevelsResponse,
+  });
+
+  // Updated data extraction to handle different response structures
+  const products = productsResponse?.data?.data || productsResponse?.data || [];
+  const categories =
+    categoriesResponse?.data?.data || categoriesResponse?.data || [];
+  const customers =
+    customersResponse?.data?.data || customersResponse?.data || [];
+  const orders = ordersResponse?.data?.data || ordersResponse?.data || [];
+  const lowStockProducts = lowStockResponse?.data || [];
+  const stockLevels = stockLevelsResponse?.data || [];
+
+  console.log("Extracted Data:", {
+    products: products.length,
+    categories: categories.length,
+    customers: customers.length,
+    orders: orders.length,
+    lowStockProducts: lowStockProducts.length,
+    stockLevels: stockLevels.length,
+  });
+
+  // Calculate dashboard stats
   const dashboardStats = [
     {
       title: "Total Products",
@@ -210,6 +351,7 @@ const AdminDashboard = () => {
       category.description?.toLowerCase().includes(categorySearch.toLowerCase())
   );
 
+  // Event handlers
   const handleDeleteProduct = (id: string) => {
     if (confirm("Are you sure you want to delete this product?")) {
       deleteProductMutation.mutate(id);
@@ -222,44 +364,31 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleCreateProduct = (formData: FormData) => {
-    const productData = {
-      name: formData.get("name"),
-      sku: formData.get("sku"),
-      category: formData.get("category"),
-      price: parseFloat(formData.get("price") as string),
-      stock_quantity: parseInt(formData.get("stock") as string),
-      description: formData.get("description"),
-      status: "active",
-    };
-
-    createProductMutation.mutate(productData);
+  const handleEditProduct = (product: unknown) => {
+    setSelectedProduct(product);
+    setIsEditProductOpen(true);
   };
 
-  const handleCreateCategory = (formData: FormData) => {
-    const categoryData = {
-      name: formData.get("name"),
-      description: formData.get("description"),
-      status: "active",
-      sort_order: 0,
-    };
-
-    createCategoryMutation.mutate(categoryData);
+  const handleEditCategory = (category: unknown) => {
+    setSelectedCategory(category);
+    setIsEditCategoryOpen(true);
   };
 
-  // Use real orders data instead of mock data
-  const recentOrders = orders.slice(0, 5).map((order: unknown) => ({
-    id: order._id || order.id,
-    customer:
-      order.customer?.user?.name || order.customer_name || "Unknown Customer",
-    status: order.status,
-    total: `$${order.total}`,
-    date: new Date(order.created_at).toLocaleDateString(),
-  }));
+  const handleViewProduct = (product: unknown) => {
+    toast.info(`Viewing product: ${product.name}`);
+  };
 
-  // Add helper function for status badges
+  const handleViewCategory = (category: unknown) => {
+    toast.info(`Viewing category: ${category.name}`);
+  };
+
+  const handleStockUpdate = (productId: string, data: unknown) => {
+    updateStockMutation.mutate({ id: productId, data });
+  };
+
+  // Helper function for status badges
   const getStatusBadge = (status: string) => {
-    const statusMap = {
+    const statusMap: Record<string, unknown> = {
       delivered: { variant: "default", color: "text-green-600" },
       processing: { variant: "secondary", color: "text-blue-600" },
       shipped: { variant: "outline", color: "text-orange-600" },
@@ -274,16 +403,44 @@ const AdminDashboard = () => {
     };
 
     return (
-      <Badge variant={config.variant as unknown} className={config.color}>
+      <Badge variant={config.variant} className={config.color}>
         {status.charAt(0).toUpperCase() + status.slice(1)}
       </Badge>
     );
   };
 
+  // Add this useEffect to handle auth failures
+  useEffect(() => {
+    const hasAuthErrors = [
+      productsError,
+      categoriesError,
+      customersError,
+      ordersError,
+      lowStockError,
+      stockLevelsError,
+    ].some((error) => error?.message === "Unauthenticated.");
+
+    if (hasAuthErrors) {
+      console.warn("🚨 Multiple auth failures detected, redirecting to login");
+      // Clear any remaining auth data
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("user");
+      // Redirect to login
+      window.location.href = "/login";
+    }
+  }, [
+    productsError,
+    categoriesError,
+    customersError,
+    ordersError,
+    lowStockError,
+    stockLevelsError,
+  ]);
+
   return (
     <div className="min-h-screen bg-muted/30">
-      {/* Admin Navbar */}
       <Header isAdmin={true} />
+
       {/* Header */}
       <header className="bg-background border-b">
         <div className="container mx-auto px-4 py-4">
@@ -295,127 +452,20 @@ const AdminDashboard = () => {
               </p>
             </div>
             <div className="flex items-center gap-4">
-              <Dialog
-                open={isAddProductOpen}
-                onOpenChange={setIsAddProductOpen}
+              <Button
+                variant="default"
+                onClick={() => setIsAddProductOpen(true)}
               >
-                <DialogTrigger asChild>
-                  <Button variant="default">
-                    <Plus className="h-4 w-4" />
-                    Add Product
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[600px]">
-                  <DialogHeader>
-                    <DialogTitle>Add New Product</DialogTitle>
-                    <DialogDescription>
-                      Create a new product for your store.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      const formData = new FormData(
-                        e.target as HTMLFormElement
-                      );
-                      handleCreateProduct(formData);
-                    }}
-                    className="space-y-4"
-                  >
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="productName">Product Name</Label>
-                        <Input
-                          id="productName"
-                          name="name"
-                          placeholder="Enter product name"
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="productSku">SKU</Label>
-                        <Input
-                          id="productSku"
-                          name="sku"
-                          placeholder="Enter SKU"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="productPrice">Price</Label>
-                        <Input
-                          id="productPrice"
-                          name="price"
-                          type="number"
-                          step="0.01"
-                          placeholder="0.00"
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="productStock">Stock Quantity</Label>
-                        <Input
-                          id="productStock"
-                          name="stock"
-                          type="number"
-                          placeholder="0"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="productCategory">Category</Label>
-                      <Select name="category" required>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {categories.map((category: unknown) => (
-                            <SelectItem
-                              key={category._id}
-                              value={category.name}
-                            >
-                              {category.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="productDescription">Description</Label>
-                      <Textarea
-                        id="productDescription"
-                        name="description"
-                        placeholder="Product description"
-                        rows={3}
-                      />
-                    </div>
-
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setIsAddProductOpen(false)}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="submit"
-                        disabled={createProductMutation.isPending}
-                      >
-                        {createProductMutation.isPending
-                          ? "Adding..."
-                          : "Add Product"}
-                      </Button>
-                    </div>
-                  </form>
-                </DialogContent>
-              </Dialog>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Product
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setIsAddCategoryOpen(true)}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Category
+              </Button>
             </div>
           </div>
         </div>
@@ -427,14 +477,16 @@ const AdminDashboard = () => {
           onValueChange={setActiveTab}
           className="space-y-6"
         >
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="products">Products</TabsTrigger>
             <TabsTrigger value="categories">Categories</TabsTrigger>
+            <TabsTrigger value="inventory">Inventory</TabsTrigger>
             <TabsTrigger value="orders">Orders</TabsTrigger>
             <TabsTrigger value="customers">Customers</TabsTrigger>
           </TabsList>
 
+          {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -472,6 +524,11 @@ const AdminDashboard = () => {
                       <div className="flex items-center justify-center py-4">
                         <Loader2 className="h-4 w-4 animate-spin" />
                       </div>
+                    ) : orders.length === 0 ? (
+                      <div className="text-center py-4 text-muted-foreground">
+                        No orders found. Orders will appear here once customers
+                        place them.
+                      </div>
                     ) : (
                       orders.slice(0, 5).map((order: unknown) => (
                         <div
@@ -479,22 +536,19 @@ const AdminDashboard = () => {
                           className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
                         >
                           <div>
-                            <p className="font-medium">{order.order_number}</p>
+                            <p className="font-medium">
+                              {order.order_number ||
+                                `Order #${order._id?.slice(-6)}`}
+                            </p>
                             <p className="text-sm text-muted-foreground">
                               {new Date(order.created_at).toLocaleDateString()}
                             </p>
                           </div>
                           <div className="text-right">
-                            <p className="font-medium">${order.total}</p>
-                            <Badge
-                              variant={
-                                order.status === "delivered"
-                                  ? "default"
-                                  : "secondary"
-                              }
-                            >
-                              {order.status}
-                            </Badge>
+                            <p className="font-medium">
+                              ${order.total || "0.00"}
+                            </p>
+                            {getStatusBadge(order.status || "pending")}
                           </div>
                         </div>
                       ))
@@ -513,95 +567,51 @@ const AdminDashboard = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {lowStockProducts.map((product, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between p-3 bg-warning/10 rounded-lg border border-warning/20"
-                      >
-                        <div>
-                          <p className="font-semibold">{product.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            SKU: {product.sku}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-warning font-bold">
-                            {product.stock} left
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Min: {product.threshold}
-                          </p>
-                        </div>
+                    {lowStockProducts.length === 0 ? (
+                      <div className="text-center py-4 text-muted-foreground">
+                        No low stock items. All products are well stocked!
                       </div>
-                    ))}
+                    ) : (
+                      lowStockProducts
+                        .slice(0, 5)
+                        .map((product: unknown, index: number) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between p-3 bg-warning/10 rounded-lg border border-warning/20"
+                          >
+                            <div>
+                              <p className="font-semibold">{product.name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                SKU: {product.sku}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-warning font-bold">
+                                {product.current_stock ||
+                                  product.stock_quantity}{" "}
+                                left
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                Status: {product.status}
+                              </p>
+                            </div>
+                          </div>
+                        ))
+                    )}
                   </div>
                 </CardContent>
               </Card>
             </div>
           </TabsContent>
 
-          <TabsContent value="orders" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>Order Management</CardTitle>
-                  <div className="flex items-center gap-2">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Search orders..."
-                        className="pl-10 w-64"
-                      />
-                    </div>
-                    <Button variant="outline">
-                      <Filter className="h-4 w-4" />
-                      Filter
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Order ID</TableHead>
-                      <TableHead>Customer</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Total</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {recentOrders.map((order) => (
-                      <TableRow key={order.id}>
-                        <TableCell className="font-mono">{order.id}</TableCell>
-                        <TableCell>{order.customer}</TableCell>
-                        <TableCell>{getStatusBadge(order.status)}</TableCell>
-                        <TableCell className="font-semibold">
-                          {order.total}
-                        </TableCell>
-                        <TableCell>{order.date}</TableCell>
-                        <TableCell>
-                          <Button variant="outline" size="sm">
-                            View Details
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
+          {/* Products Tab */}
           <TabsContent value="products" className="space-y-6">
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2">
                     <Package className="h-5 w-5" />
-                    Product Management
+                    Product Management ({filteredProducts.length} products)
                   </CardTitle>
                   <div className="flex items-center gap-2">
                     <div className="relative">
@@ -625,80 +635,208 @@ const AdminDashboard = () => {
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="h-8 w-8 animate-spin" />
                   </div>
+                ) : filteredProducts.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-semibold">No products found</h3>
+                    <p className="text-muted-foreground mb-4">
+                      {productSearch
+                        ? "No products match your search criteria."
+                        : "Start by adding your first product."}
+                    </p>
+                    <Button onClick={() => setIsAddProductOpen(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Product
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filteredProducts.map((product: unknown) => (
+                      <ProductCard
+                        key={product._id}
+                        product={product}
+                        onEdit={handleEditProduct}
+                        onDelete={handleDeleteProduct}
+                        onView={handleViewProduct}
+                      />
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Categories Tab */}
+          <TabsContent value="categories" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Tag className="h-5 w-5" />
+                    Category Management ({filteredCategories.length} categories)
+                  </CardTitle>
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search categories..."
+                        className="pl-10 w-64"
+                        value={categorySearch}
+                        onChange={(e) => setCategorySearch(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {categoriesLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                  </div>
+                ) : filteredCategories.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Tag className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-semibold">
+                      No categories found
+                    </h3>
+                    <p className="text-muted-foreground mb-4">
+                      {categorySearch
+                        ? "No categories match your search criteria."
+                        : "Start by adding your first category."}
+                    </p>
+                    <Button onClick={() => setIsAddCategoryOpen(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Category
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filteredCategories.map((category: unknown) => (
+                      <CategoryCard
+                        key={category._id}
+                        category={category}
+                        onEdit={handleEditCategory}
+                        onDelete={handleDeleteCategory}
+                        onView={handleViewCategory}
+                      />
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Inventory Tab */}
+          <TabsContent value="inventory" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5" />
+                  Inventory Management ({products.length} products)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {stockLevelsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                  </div>
+                ) : products.length === 0 ? (
+                  <div className="text-center py-8">
+                    <BarChart3 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-semibold">No inventory data</h3>
+                    <p className="text-muted-foreground">
+                      Add products to start managing inventory.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {products.map((product: unknown) => (
+                      <InventoryUpdateForm
+                        key={product._id}
+                        product={product}
+                        onStockUpdate={handleStockUpdate}
+                        isUpdating={updateStockMutation.isPending}
+                      />
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Orders Tab */}
+          <TabsContent value="orders" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>
+                    Order Management ({orders.length} orders)
+                  </CardTitle>
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search orders..."
+                        className="pl-10 w-64"
+                      />
+                    </div>
+                    <Button variant="outline">
+                      <Filter className="h-4 w-4" />
+                      Filter
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {ordersLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                  </div>
+                ) : orders.length === 0 ? (
+                  <div className="text-center py-8">
+                    <ShoppingCart className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-semibold">No orders yet</h3>
+                    <p className="text-muted-foreground">
+                      Orders will appear here when customers make purchases.
+                    </p>
+                  </div>
                 ) : (
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Product</TableHead>
-                        <TableHead>SKU</TableHead>
-                        <TableHead>Category</TableHead>
-                        <TableHead>Price</TableHead>
-                        <TableHead>Stock</TableHead>
+                        <TableHead>Order ID</TableHead>
+                        <TableHead>Customer</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead>Total</TableHead>
+                        <TableHead>Date</TableHead>
                         <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredProducts.map((product: unknown) => (
-                        <TableRow key={product._id}>
-                          <TableCell>
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 bg-muted rounded-md flex items-center justify-center">
-                                <Package className="h-5 w-5 text-muted-foreground" />
-                              </div>
-                              <div>
-                                <p className="font-medium">{product.name}</p>
-                                <p className="text-sm text-muted-foreground">
-                                  {product.description?.substring(0, 30)}...
-                                </p>
-                              </div>
-                            </div>
-                          </TableCell>
+                      {orders.slice(0, 10).map((order: unknown) => (
+                        <TableRow key={order._id}>
                           <TableCell className="font-mono">
-                            {product.sku}
+                            {order.order_number || `#${order._id?.slice(-6)}`}
                           </TableCell>
-                          <TableCell>{product.category}</TableCell>
+                          <TableCell>
+                            {order.customer?.user?.name || "Unknown Customer"}
+                          </TableCell>
+                          <TableCell>
+                            {getStatusBadge(order.status || "pending")}
+                          </TableCell>
                           <TableCell className="font-semibold">
-                            ${product.price}
+                            ${order.total || "0.00"}
                           </TableCell>
                           <TableCell>
-                            <span
-                              className={
-                                product.stock_quantity === 0
-                                  ? "text-destructive"
-                                  : product.stock_quantity < 5
-                                  ? "text-warning"
-                                  : ""
-                              }
-                            >
-                              {product.stock_quantity}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                product.status === "active"
-                                  ? "default"
-                                  : "secondary"
-                              }
-                            >
-                              {product.status}
-                            </Badge>
+                            {new Date(order.created_at).toLocaleDateString()}
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <Button variant="outline" size="sm">
-                                <Eye className="h-4 w-4" />
+                                View
                               </Button>
                               <Button variant="outline" size="sm">
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleDeleteProduct(product._id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
+                                Edit
                               </Button>
                             </div>
                           </TableCell>
@@ -711,172 +849,14 @@ const AdminDashboard = () => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="categories" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Tag className="h-5 w-5" />
-                    Category Management
-                  </CardTitle>
-                  <div className="flex items-center gap-2">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Search categories..."
-                        className="pl-10 w-64"
-                        value={categorySearch}
-                        onChange={(e) => setCategorySearch(e.target.value)}
-                      />
-                    </div>
-                    <Dialog
-                      open={isAddCategoryOpen}
-                      onOpenChange={setIsAddCategoryOpen}
-                    >
-                      <DialogTrigger asChild>
-                        <Button variant="default">
-                          <Plus className="h-4 w-4" />
-                          Add Category
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-md">
-                        <DialogHeader>
-                          <DialogTitle>Add New Category</DialogTitle>
-                          <DialogDescription>
-                            Create a new product category.
-                          </DialogDescription>
-                        </DialogHeader>
-                        <form
-                          onSubmit={(e) => {
-                            e.preventDefault();
-                            const formData = new FormData(
-                              e.target as HTMLFormElement
-                            );
-                            handleCreateCategory(formData);
-                          }}
-                          className="space-y-4"
-                        >
-                          <div className="space-y-2">
-                            <Label htmlFor="categoryName">Category Name</Label>
-                            <Input
-                              id="categoryName"
-                              name="name"
-                              placeholder="Enter category name"
-                              required
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="categoryDescription">
-                              Description
-                            </Label>
-                            <Textarea
-                              id="categoryDescription"
-                              name="description"
-                              placeholder="Category description"
-                              rows={3}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="categorySortOrder">
-                              Sort Order
-                            </Label>
-                            <Input
-                              id="categorySortOrder"
-                              name="sort_order"
-                              type="number"
-                              placeholder="0"
-                              defaultValue="0"
-                            />
-                          </div>
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => setIsAddCategoryOpen(false)}
-                            >
-                              Cancel
-                            </Button>
-                            <Button
-                              type="submit"
-                              disabled={createCategoryMutation.isPending}
-                            >
-                              {createCategoryMutation.isPending
-                                ? "Adding..."
-                                : "Add Category"}
-                            </Button>
-                          </div>
-                        </form>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead>Products</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Created Date</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredCategories.map((category) => (
-                      <TableRow key={category.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-primary/10 rounded-md flex items-center justify-center">
-                              <Folder className="h-5 w-5 text-primary" />
-                            </div>
-                            <div>
-                              <p className="font-medium">{category.name}</p>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground max-w-xs">
-                          {category.description}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {category.products}
-                        </TableCell>
-                        <TableCell>{getStatusBadge(category.status)}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                            <Calendar className="h-3 w-3" />
-                            {category.createdDate}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button variant="outline" size="sm">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button variant="outline" size="sm">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
+          {/* Customers Tab */}
           <TabsContent value="customers" className="space-y-6">
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2">
                     <Users className="h-5 w-5" />
-                    Customer Management
+                    Customer Management ({filteredCustomers.length} customers)
                   </CardTitle>
                   <div className="flex items-center gap-2">
                     <div className="relative">
@@ -896,94 +876,164 @@ const AdminDashboard = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Customer</TableHead>
-                      <TableHead>Contact</TableHead>
-                      <TableHead>Orders</TableHead>
-                      <TableHead>Total Spent</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Join Date</TableHead>
-                      <TableHead>Last Order</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredCustomers.map((customer) => (
-                      <TableRow key={customer.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                              <span className="text-sm font-medium text-primary">
-                                {customer.name
-                                  .split(" ")
-                                  .map((n) => n[0])
-                                  .join("")}
-                              </span>
-                            </div>
-                            <div>
-                              <p className="font-medium">{customer.name}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {customer.email}
-                              </p>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2 text-sm">
-                              <Mail className="h-3 w-3" />
-                              <span className="text-muted-foreground">
-                                {customer.email}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2 text-sm">
-                              <Phone className="h-3 w-3" />
-                              <span className="text-muted-foreground">
-                                {customer.phone}
-                              </span>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {customer.orders}
-                        </TableCell>
-                        <TableCell className="font-semibold">
-                          ${customer.totalSpent.toFixed(2)}
-                        </TableCell>
-                        <TableCell>{getStatusBadge(customer.status)}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                            <Calendar className="h-3 w-3" />
-                            {customer.joinDate}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {customer.lastOrder}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button variant="outline" size="sm">
-                              <Mail className="h-4 w-4" />
-                            </Button>
-                            <Button variant="outline" size="sm">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
+                {customersLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                  </div>
+                ) : filteredCustomers.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-semibold">
+                      No customers found
+                    </h3>
+                    <p className="text-muted-foreground">
+                      {customerSearch
+                        ? "No customers match your search criteria."
+                        : "Customers will appear here when they register."}
+                    </p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Customer</TableHead>
+                        <TableHead>Contact</TableHead>
+                        <TableHead>Orders</TableHead>
+                        <TableHead>Total Spent</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Joined</TableHead>
+                        <TableHead>Last Order</TableHead>
+                        <TableHead>Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredCustomers.map((customer: unknown) => (
+                        <TableRow key={customer._id}>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+                                <span className="text-sm font-medium text-primary">
+                                  {customer.user?.name
+                                    ?.split(" ")
+                                    .map((n: string) => n[0])
+                                    .join("") || "N/A"}
+                                </span>
+                              </div>
+                              <div>
+                                <p className="font-medium">
+                                  {customer.user?.name || "Unknown"}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  ID: {customer._id?.slice(-6)}
+                                </p>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2 text-sm">
+                                <Mail className="h-3 w-3" />
+                                <span className="text-muted-foreground">
+                                  {customer.user?.email || "No email"}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 text-sm">
+                                <Phone className="h-3 w-3" />
+                                <span className="text-muted-foreground">
+                                  {customer.phone || "No phone"}
+                                </span>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {customer.orders_count || 0}
+                          </TableCell>
+                          <TableCell className="font-semibold">
+                            ${customer.total_spent?.toFixed(2) || "0.00"}
+                          </TableCell>
+                          <TableCell>
+                            {getStatusBadge(customer.user?.status || "active")}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                              <Calendar className="h-3 w-3" />
+                              {new Date(
+                                customer.created_at
+                              ).toLocaleDateString()}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {customer.last_order_date
+                              ? new Date(
+                                  customer.last_order_date
+                                ).toLocaleDateString()
+                              : "Never"}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Button variant="outline" size="sm">
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button variant="outline" size="sm">
+                                <Mail className="h-4 w-4" />
+                              </Button>
+                              <Button variant="outline" size="sm">
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Form Dialogs */}
+      <ProductForm
+        isOpen={isAddProductOpen}
+        onOpenChange={setIsAddProductOpen}
+        categories={categories}
+        onSubmit={(data) => createProductMutation.mutate(data)}
+        isLoading={createProductMutation.isPending}
+        mode="create"
+      />
+
+      <ProductForm
+        isOpen={isEditProductOpen}
+        onOpenChange={setIsEditProductOpen}
+        product={selectedProduct}
+        categories={categories}
+        onUpdate={(id, data) => updateProductMutation.mutate({ id, data })}
+        isLoading={updateProductMutation.isPending}
+        mode="edit"
+      />
+
+      <CategoryForm
+        isOpen={isAddCategoryOpen}
+        onOpenChange={setIsAddCategoryOpen}
+        categories={categories}
+        onSubmit={(data) => createCategoryMutation.mutate(data)}
+        isLoading={createCategoryMutation.isPending}
+        mode="create"
+      />
+
+      <CategoryForm
+        isOpen={isEditCategoryOpen}
+        onOpenChange={setIsEditCategoryOpen}
+        category={selectedCategory}
+        categories={categories}
+        onUpdate={(id, data) => updateCategoryMutation.mutate({ id, data })}
+        isLoading={updateCategoryMutation.isPending}
+        mode="edit"
+      />
+
+      <DebugPanel />
+      <TokenDebug />
     </div>
   );
 };

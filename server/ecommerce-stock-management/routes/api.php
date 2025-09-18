@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Http\Request; // ✅ Add this import
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\OrderController;
@@ -65,19 +66,29 @@ Route::get('/products/{id}', [ProductController::class, 'show']);
 Route::get('/categories', [CategoryController::class, 'index']);
 
 // Health check
-Route::get('/health', function() {
+Route::get('/health', function () {
     return response()->json([
-        'success' => true,
-        'message' => 'API Health Check Successful',
         'status' => 'healthy',
         'timestamp' => now(),
-        'auth' => 'sanctum',
-        'routes' => [
-            'admin_login' => '/api/auth/admin/login',
-            'customer_login' => '/api/auth/customer/login',
-            'customer_register' => '/api/auth/customer/register',
-            'social_google' => '/api/auth/social/google',
-            'social_github' => '/api/auth/social/github',
+        'services' => [
+            'laravel' => 'running',
+            'mongodb' => config('database.default') === 'mongodb' ? 'configured' : 'not configured',
+            'redis' => config('cache.default') === 'redis' ? 'configured' : 'not configured'
         ]
     ]);
 });
+
+// Debug Auth route (for development purposes)
+Route::get('/debug-auth', function (Request $request) {
+    $user = $request->user();
+
+    return response()->json([
+        'sanctum_user' => $user,
+        'user_id' => $user?->id,
+        'user_role' => $user?->role,
+        'token_exists' => $request->bearerToken() ? 'yes' : 'no',
+        'token_preview' => $request->bearerToken() ? substr($request->bearerToken(), 0, 20) . '...' : null,
+        'middleware_passed' => 'auth:sanctum middleware working',
+        'timestamp' => now()
+    ]);
+})->middleware('auth:sanctum');

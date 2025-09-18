@@ -2,7 +2,13 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  createBrowserRouter,
+  RouterProvider,
+} from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AdminRoute from "@/components/AdminRoute";
@@ -25,65 +31,97 @@ import Checkout from "./pages/Checkout";
 
 const queryClient = new QueryClient();
 
+// Create router with future flags
+const router = createBrowserRouter(
+  [
+    {
+      path: "/",
+      element: <Index />,
+    },
+    {
+      path: "/login",
+      element: <Login />,
+    },
+    {
+      path: "/register",
+      element: <Register />,
+    },
+    {
+      path: "/shop",
+      element: <Shop />,
+    },
+    {
+      path: "/search",
+      element: <Search />,
+    },
+    {
+      path: "/category/:categoryName",
+      element: <Category />,
+    },
+    {
+      path: "/deals",
+      element: <Deals />,
+    },
+    {
+      path: "/about",
+      element: <About />,
+    },
+    {
+      path: "/contact",
+      element: <Contact />,
+    },
+    {
+      path: "/profile",
+      element: (
+        <ProtectedRoute>
+          <Profile />
+        </ProtectedRoute>
+      ),
+    },
+    {
+      path: "/cart",
+      element: (
+        <ProtectedRoute>
+          <Cart />
+        </ProtectedRoute>
+      ),
+    },
+    {
+      path: "/checkout",
+      element: (
+        <ProtectedRoute>
+          <Checkout />
+        </ProtectedRoute>
+      ),
+    },
+    {
+      path: "/admin/*",
+      element: (
+        <AdminRoute>
+          <AdminDashboard />
+        </AdminRoute>
+      ),
+    },
+    {
+      path: "*",
+      element: <NotFound />,
+    },
+  ],
+  {
+    future: {
+      v7_startTransition: true,
+      v7_relativeSplatPath: true,
+    },
+  }
+);
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <AuthProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
-          <Routes>
-            {/* Public Routes */}
-            <Route path="/" element={<Index />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/shop" element={<Shop />} />
-            <Route path="/search" element={<Search />} />
-            <Route path="/category/:categoryName" element={<Category />} />
-            <Route path="/deals" element={<Deals />} />
-            <Route path="/about" element={<About />} />
-            <Route path="/contact" element={<Contact />} />
-
-            {/* Protected Customer Routes */}
-            <Route
-              path="/profile"
-              element={
-                <ProtectedRoute>
-                  <Profile />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/cart"
-              element={
-                <ProtectedRoute>
-                  <Cart />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/checkout"
-              element={
-                <ProtectedRoute>
-                  <Checkout />
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Admin Protected Routes */}
-            <Route
-              path="/admin/*"
-              element={
-                <AdminRoute>
-                  <AdminDashboard />
-                </AdminRoute>
-              }
-            />
-
-            {/* 404 Route */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
+        <RouterProvider router={router} />
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>

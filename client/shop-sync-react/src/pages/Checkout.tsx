@@ -2,7 +2,13 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import PaymentForm from "@/components/PaymentForm";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Truck, Shield, CreditCard } from "lucide-react";
@@ -14,29 +20,32 @@ const mockCartItems = [
     name: "Premium Wireless Headphones",
     price: 299.99,
     quantity: 1,
-    image: "/placeholder.svg"
+    image: "/placeholder.svg",
   },
   {
     id: "2",
     name: "Luxury Smart Watch",
     price: 899.99,
     quantity: 1,
-    image: "/placeholder.svg"
-  }
+    image: "/placeholder.svg",
+  },
 ];
 
 const Checkout = () => {
   const navigate = useNavigate();
   const [cartItems] = useState(mockCartItems);
 
-  const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const subtotal = cartItems.reduce(
+    (sum, item) => sum + item.price * item.quantity,
+    0
+  );
   const tax = subtotal * 0.08; // 8% tax
   const shipping = subtotal > 100 ? 0 : 15.99; // Free shipping over $100
   const total = subtotal + tax + shipping;
 
   const handlePaymentSuccess = () => {
-    navigate("/", { 
-      state: { message: "Order placed successfully!" }
+    navigate("/", {
+      state: { message: "Order placed successfully!" },
     });
   };
 
@@ -67,10 +76,13 @@ const Checkout = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 {cartItems.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between">
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between"
+                  >
                     <div className="flex items-center space-x-3">
-                      <img 
-                        src={item.image} 
+                      <img
+                        src={item.image}
                         alt={item.name}
                         className="w-12 h-12 rounded-md object-cover"
                       />
@@ -98,7 +110,9 @@ const Checkout = () => {
                   </div>
                   <div className="flex justify-between">
                     <span>Shipping</span>
-                    <span>{shipping === 0 ? "Free" : `$${shipping.toFixed(2)}`}</span>
+                    <span>
+                      {shipping === 0 ? "Free" : `$${shipping.toFixed(2)}`}
+                    </span>
                   </div>
                   <Separator />
                   <div className="flex justify-between font-bold text-lg">
@@ -121,7 +135,9 @@ const Checkout = () => {
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
                     <CreditCard className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm">SSL encrypted payment processing</span>
+                    <span className="text-sm">
+                      SSL encrypted payment processing
+                    </span>
                   </div>
                   <div className="flex items-center gap-3">
                     <Truck className="h-4 w-4 text-muted-foreground" />
@@ -132,7 +148,7 @@ const Checkout = () => {
                     <span className="text-sm">30-day money-back guarantee</span>
                   </div>
                 </div>
-                
+
                 <div className="flex gap-2 mt-4">
                   <Badge variant="secondary">Visa</Badge>
                   <Badge variant="secondary">Mastercard</Badge>
@@ -145,7 +161,7 @@ const Checkout = () => {
 
           {/* Payment Form */}
           <div>
-            <PaymentForm 
+            <PaymentForm
               amount={total}
               onSuccess={handlePaymentSuccess}
               onCancel={handleCancel}

@@ -36,26 +36,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const initializeAuth = async () => {
     try {
       const { token, user: storedUser } = authService.getAuthData();
+      console.log("Auth initialization:", { token: !!token, user: storedUser });
 
       if (token && storedUser) {
-        // Verify token is still valid by fetching current user
+        // Set user immediately from localStorage
+        setUser(storedUser);
+
+        // Verify token in background (don't clear user if this fails)
         try {
           const response = await authService.getCurrentUser();
+          console.log("Token verification response:", response);
+
           if (response.success && response.user) {
+            // Update user with fresh data
             setUser(response.user);
-          } else {
-            // Token is invalid, clear it
-            authService.clearAuthData();
           }
+          // If token verification fails, we still keep the stored user
+          // The backend will handle invalid tokens on subsequent requests
         } catch (error) {
-          // API call failed, might be network issue, keep stored user for now
-          console.warn("Could not verify token, keeping stored user:", error);
-          setUser(storedUser);
+          console.warn(
+            "Token verification failed, keeping stored user:",
+            error
+          );
+          // Don't clear auth data here - let the user stay logged in
+          // Invalid tokens will be handled by API interceptors
         }
       }
     } catch (error) {
       console.error("Auth initialization error:", error);
-      authService.clearAuthData();
+      // Only clear auth data if there's a parsing error with stored data
+      if (error instanceof SyntaxError) {
+        authService.clearAuthData();
+      }
     } finally {
       setIsLoading(false);
     }
@@ -68,6 +80,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(response.user);
       toast.success("Login successful!");
     } catch (error: unknown) {
+      console.error("Login error:", error);
       toast.error(error.message || "Login failed");
       throw error;
     } finally {
@@ -82,6 +95,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(response.user);
       toast.success("Registration successful!");
     } catch (error: unknown) {
+      console.error("Registration error:", error);
       toast.error(error.message || "Registration failed");
       throw error;
     } finally {
@@ -96,8 +110,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(response.user);
       toast.success("Admin login successful!");
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Admin login failed";
+      console.error("Admin login error:", error);
+      const errorMessage = error.message || "Admin login failed";
       toast.error(errorMessage);
       throw error;
     } finally {
@@ -105,15 +119,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  // Update the logout function
   const logout = async () => {
     try {
-      await authService.logout();
+      const result = await authService.logout();
       setUser(null);
-      toast.success("Logged out successfully");
+      toast.success(result.message || "Logged out successfully");
     } catch (error: unknown) {
       console.error("Logout error:", error);
       // Still clear local state even if API call fails
       setUser(null);
+      authService.clearAuthData();
       toast.success("Logged out");
     }
   };
@@ -126,6 +142,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
     } catch (error) {
       console.error("Failed to refresh user:", error);
+      // Don't clear user data on refresh failure
     }
   };
 

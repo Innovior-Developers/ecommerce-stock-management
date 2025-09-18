@@ -96,29 +96,65 @@ class AuthService {
   }
 
   // Admin login
-  async adminLogin(credentials: LoginCredentials): Promise<AuthResponse> {
-    const response = await apiService.post<AuthResponse>(
-      API_ENDPOINTS.AUTH.ADMIN_LOGIN,
-      credentials
-    );
+  async adminLogin(credentials: LoginCredentials): Promise<ApiResponse> {
+    try {
+      const response = await apiService.post(
+        API_ENDPOINTS.AUTH.ADMIN_LOGIN,
+        credentials
+      );
 
-    if (response.success && response.token) {
-      this.setAuthData(response as AuthResponse);
+      if (response.success && response.token) {
+        const userData = {
+          user: response.user,
+          role: "admin",
+        };
+
+        // Use the new setToken method
+        apiService.setToken(response.token);
+        localStorage.setItem("user", JSON.stringify(userData));
+
+        return response;
+      }
+
+      throw new Error(response.message || "Login failed");
+    } catch (error) {
+      console.error("Admin login error:", error);
+      throw error;
     }
-
-    return response as AuthResponse;
   }
 
   // Logout
   async logout(): Promise<ApiResponse> {
     try {
-      const response = await apiService.post(API_ENDPOINTS.AUTH.LOGOUT);
-      this.clearAuthData();
-      return response;
+      // Only call logout API if we have a token
+      const { token } = this.getAuthData();
+
+      if (token) {
+        console.log("🔓 Calling logout API with token");
+        const response = await apiService.post(API_ENDPOINTS.AUTH.LOGOUT);
+        this.clearAuthData();
+        return response;
+      } else {
+        console.log("🔓 No token found, performing local logout only");
+        this.clearAuthData();
+        return {
+          success: true,
+          message: "Logged out successfully (local)",
+        };
+      }
     } catch (error) {
+      console.warn(
+        "⚠️ Logout API call failed, clearing local data anyway:",
+        error
+      );
       // Clear auth data even if logout request fails
       this.clearAuthData();
-      throw error;
+
+      // Return success since local logout still worked
+      return {
+        success: true,
+        message: "Logged out successfully (local)",
+      };
     }
   }
 

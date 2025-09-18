@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
+import axios, { AxiosInstance, AxiosRequestConfig } from "axios";
 import { API_CONFIG } from "./config";
 
 export interface ApiResponse<T = unknown> {
@@ -19,6 +19,7 @@ export interface ApiError {
 
 class ApiService {
   private api: AxiosInstance;
+  private isTokenCleared = false; // Add this flag
 
   constructor() {
     this.api = axios.create({
@@ -35,27 +36,82 @@ class ApiService {
     this.api.interceptors.request.use(
       (config) => {
         const token = localStorage.getItem("auth_token");
+
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
+          console.log(
+            `🔐 Token added to ${config.method?.toUpperCase()} ${config.url}`
+          );
+          // Reset the flag when we have a token
+          this.isTokenCleared = false;
+        } else {
+          const protectedEndpoints = ["/admin/", "/auth/logout", "/auth/user"];
+          const needsToken = protectedEndpoints.some((endpoint) =>
+            config.url?.includes(endpoint)
+          );
+
+          if (needsToken && !this.isTokenCleared) {
+            console.warn(
+              `⚠️  No token for protected endpoint: ${config.method?.toUpperCase()} ${
+                config.url
+              }`
+            );
+          }
         }
         return config;
       },
       (error) => Promise.reject(error)
     );
 
-    // Response interceptor for error handling
+    // Response interceptor to handle common errors
     this.api.interceptors.response.use(
-      (response: AxiosResponse) => response,
+      (response) => {
+        console.log(
+          `✅ ${response.config.method?.toUpperCase()} ${response.config.url}:`,
+          response.data
+        );
+        return response;
+      },
       (error) => {
+        console.error(`❌ API Error Response:`, error.response?.data);
+
         if (error.response?.status === 401) {
-          // Token expired or invalid
-          localStorage.removeItem("auth_token");
-          localStorage.removeItem("user");
-          window.location.href = "/login";
+          const isLogoutEndpoint = error.config?.url?.includes("/auth/logout");
+
+          if (isLogoutEndpoint) {
+            console.log(
+              "ℹ️ 401 on logout endpoint is expected when token is already cleared"
+            );
+          } else if (!this.isTokenCleared) {
+            // Only clear token once to prevent cascade
+            console.warn(
+              "🚨 401 Unauthorized - clearing invalid token (first time)"
+            );
+            this.isTokenCleared = true;
+            localStorage.removeItem("auth_token");
+            localStorage.removeItem("user");
+
+            // Optionally redirect to login after a delay to prevent immediate cascade
+            setTimeout(() => {
+              if (window.location.pathname.includes("/admin")) {
+                window.location.href = "/login";
+              }
+            }, 1000);
+          } else {
+            console.log(
+              "🔄 401 Unauthorized - token already cleared, skipping"
+            );
+          }
         }
         return Promise.reject(error);
       }
     );
+  }
+
+  // Reset token cleared flag when getting new token
+  setToken(token: string) {
+    localStorage.setItem("auth_token", token);
+    this.isTokenCleared = false;
   }
 
   async get<T = unknown>(
@@ -65,7 +121,8 @@ class ApiService {
     try {
       const response = await this.api.get(endpoint, config);
       return response.data;
-    } catch (error: unknown) {
+    } catch (error) {
+      console.error(`GET ${endpoint} failed:`, error);
       throw this.handleError(error);
     }
   }
@@ -78,7 +135,8 @@ class ApiService {
     try {
       const response = await this.api.post(endpoint, data, config);
       return response.data;
-    } catch (error: unknown) {
+    } catch (error) {
+      console.error(`POST ${endpoint} failed:`, error);
       throw this.handleError(error);
     }
   }
@@ -91,7 +149,8 @@ class ApiService {
     try {
       const response = await this.api.put(endpoint, data, config);
       return response.data;
-    } catch (error: unknown) {
+    } catch (error) {
+      console.error(`PUT ${endpoint} failed:`, error);
       throw this.handleError(error);
     }
   }
@@ -103,7 +162,8 @@ class ApiService {
     try {
       const response = await this.api.delete(endpoint, config);
       return response.data;
-    } catch (error: unknown) {
+    } catch (error) {
+      console.error(`DELETE ${endpoint} failed:`, error);
       throw this.handleError(error);
     }
   }
@@ -151,79 +211,92 @@ class ApiService {
   }
 }
 
+export const apiService = new ApiService();
+
 // Products API
 export async function getAdminProducts(params?: unknown) {
-  return apiService.get(API_ENDPOINTS.ADMIN.PRODUCTS, { params });
+  console.log("Calling getAdminProducts with params:", params);
+  return apiService.get("/admin/products", { params });
 }
 
 export async function createAdminProduct(data: unknown) {
-  return apiService.post(API_ENDPOINTS.ADMIN.PRODUCTS, data);
+  console.log("Calling createAdminProduct with data:", data);
+  return apiService.post("/admin/products", data);
 }
 
 export async function updateAdminProduct(id: string, data: unknown) {
-  return apiService.put(`${API_ENDPOINTS.ADMIN.PRODUCTS}/${id}`, data);
+  console.log("Calling updateAdminProduct with id:", id, "data:", data);
+  return apiService.put(`/admin/products/${id}`, data);
 }
 
 export async function deleteAdminProduct(id: string) {
-  return apiService.delete(`${API_ENDPOINTS.ADMIN.PRODUCTS}/${id}`);
+  console.log("Calling deleteAdminProduct with id:", id);
+  return apiService.delete(`/admin/products/${id}`);
 }
 
 // Categories API
 export async function getAdminCategories(params?: unknown) {
-  return apiService.get(API_ENDPOINTS.ADMIN.CATEGORIES, { params });
+  console.log("Calling getAdminCategories with params:", params);
+  return apiService.get("/admin/categories", { params });
 }
 
 export async function createAdminCategory(data: unknown) {
-  return apiService.post(API_ENDPOINTS.ADMIN.CATEGORIES, data);
+  console.log("Calling createAdminCategory with data:", data);
+  return apiService.post("/admin/categories", data);
 }
 
 export async function updateAdminCategory(id: string, data: unknown) {
-  return apiService.put(`${API_ENDPOINTS.ADMIN.CATEGORIES}/${id}`, data);
+  console.log("Calling updateAdminCategory with id:", id, "data:", data);
+  return apiService.put(`/admin/categories/${id}`, data);
 }
 
 export async function deleteAdminCategory(id: string) {
-  return apiService.delete(`${API_ENDPOINTS.ADMIN.CATEGORIES}/${id}`);
+  console.log("Calling deleteAdminCategory with id:", id);
+  return apiService.delete(`/admin/categories/${id}`);
 }
 
 // Customers API
 export async function getAdminCustomers(params?: unknown) {
-  return apiService.get(API_ENDPOINTS.ADMIN.CUSTOMERS, { params });
+  console.log("Calling getAdminCustomers with params:", params);
+  return apiService.get("/admin/customers", { params });
 }
 
 export async function updateAdminCustomer(id: string, data: unknown) {
-  return apiService.put(`${API_ENDPOINTS.ADMIN.CUSTOMERS}/${id}`, data);
+  return apiService.put(`/admin/customers/${id}`, data);
 }
 
 export async function deleteAdminCustomer(id: string) {
-  return apiService.delete(`${API_ENDPOINTS.ADMIN.CUSTOMERS}/${id}`);
+  return apiService.delete(`/admin/customers/${id}`);
 }
 
 // Orders API
 export async function getAdminOrders(params?: unknown) {
-  return apiService.get(API_ENDPOINTS.ADMIN.ORDERS, { params });
+  console.log("Calling getAdminOrders with params:", params);
+  return apiService.get("/admin/orders", { params });
 }
 
 export async function updateAdminOrder(id: string, data: unknown) {
-  return apiService.put(`${API_ENDPOINTS.ADMIN.ORDERS}/${id}`, data);
+  return apiService.put(`/admin/orders/${id}`, data);
 }
 
 export async function deleteAdminOrder(id: string) {
-  return apiService.delete(`${API_ENDPOINTS.ADMIN.ORDERS}/${id}`);
+  return apiService.delete(`/admin/orders/${id}`);
 }
 
 // Inventory API
 export async function getStockLevels() {
-  return apiService.get(`${API_ENDPOINTS.ADMIN.INVENTORY}/stock-levels`);
+  console.log("Calling getStockLevels");
+  return apiService.get("/admin/inventory/stock-levels");
 }
 
 export async function getLowStock() {
-  return apiService.get(`${API_ENDPOINTS.ADMIN.INVENTORY}/low-stock`);
+  console.log("Calling getLowStock");
+  return apiService.get("/admin/inventory/low-stock");
 }
 
 export async function updateStock(id: string, data: unknown) {
-  return apiService.put(`${API_ENDPOINTS.ADMIN.INVENTORY}/${id}`, data);
+  console.log("Calling updateStock with id:", id, "data:", data);
+  return apiService.put(`/admin/inventory/${id}`, data);
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
-export const apiService = new ApiService();
 export default ApiService;

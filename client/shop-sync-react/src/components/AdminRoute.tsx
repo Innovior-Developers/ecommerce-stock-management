@@ -10,6 +10,13 @@ const AdminRoute: React.FC<AdminRouteProps> = ({ children }) => {
   const { user, isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
 
+  console.log("AdminRoute check:", {
+    isLoading,
+    isAuthenticated,
+    user: user ? { id: user.id, role: user.role } : null,
+    location: location.pathname,
+  });
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -22,15 +29,16 @@ const AdminRoute: React.FC<AdminRouteProps> = ({ children }) => {
   }
 
   if (!isAuthenticated) {
-    // Redirect to login with the current location
+    console.log("AdminRoute: Not authenticated, redirecting to login");
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   if (user?.role !== "admin") {
-    // Redirect non-admin users to home page
+    console.log("AdminRoute: Not admin user, redirecting to home");
     return <Navigate to="/" replace />;
   }
 
+  console.log("AdminRoute: Access granted");
   return <>{children}</>;
 };
 
