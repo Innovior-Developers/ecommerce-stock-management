@@ -29,15 +29,16 @@ Route::prefix('auth')->group(function () {
     Route::post('/customer/register', [AuthController::class, 'customerRegister']);
     Route::post('/customer/login', [AuthController::class, 'customerLogin']);
 
-    // Social authentication
-    Route::get('/social/{provider}', [SocialAuthController::class, 'redirectToProvider']);
-    Route::get('/social/{provider}/callback', [SocialAuthController::class, 'handleProviderCallback']);
-
     // Protected routes
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/user', [AuthController::class, 'user']);
+        Route::post('/refresh', [AuthController::class, 'refreshToken']);
     });
+
+    // Social authentication
+    Route::get('/social/{provider}', [SocialAuthController::class, 'redirectToProvider']);
+    Route::get('/social/{provider}/callback', [SocialAuthController::class, 'handleProviderCallback']);
 });
 
 // Admin routes (for managing resources)

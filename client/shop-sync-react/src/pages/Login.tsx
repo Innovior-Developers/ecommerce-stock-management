@@ -1,56 +1,84 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useAuth } from "@/contexts/AuthContext";
+import {
+  useAdminLoginMutation,
+  useCustomerLoginMutation,
+} from "@/store/api/authApi";
+import { useAppSelector } from "@/store/hooks";
 import { toast } from "sonner";
 
 const Login = () => {
   const [customerForm, setCustomerForm] = useState({ email: "", password: "" });
   const [adminForm, setAdminForm] = useState({ email: "", password: "" });
-  const [isLoading, setIsLoading] = useState(false);
-  
-  const { login, adminLogin } = useAuth();
+
+  const [adminLogin, { isLoading: adminLoading }] = useAdminLoginMutation();
+  const [customerLogin, { isLoading: customerLoading }] =
+    useCustomerLoginMutation();
+
+  const { isAuthenticated, user } = useAppSelector((state) => state.auth);
   const navigate = useNavigate();
   const location = useLocation();
-  
+
   const from = location.state?.from?.pathname || "/";
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      if (user.role === "admin") {
+        navigate("/admin", { replace: true });
+      } else {
+        navigate(from, { replace: true });
+      }
+    }
+  }, [isAuthenticated, user, navigate, from]);
 
   const handleCustomerSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    
+
     try {
-      await login(customerForm);
-      navigate(from, { replace: true });
-    } catch (error) {
-      console.error('Customer login error:', error);
-    } finally {
-      setIsLoading(false);
+      const response = await customerLogin(customerForm).unwrap();
+      if (response.success) {
+        toast.success("Login successful!");
+        navigate(from, { replace: true });
+      }
+    } catch (error: unknown) {
+      console.error("Customer login error:", error);
+      toast.error(error.data?.message || "Login failed");
     }
   };
 
   const handleAdminSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    
+
     try {
-      await adminLogin(adminForm);
-      navigate('/admin/dashboard', { replace: true });
-    } catch (error) {
-      console.error('Admin login error:', error);
-    } finally {
-      setIsLoading(false);
+      const response = await adminLogin(adminForm).unwrap();
+      if (response.success) {
+        toast.success("Admin login successful!");
+        navigate("/admin", { replace: true });
+      }
+    } catch (error: unknown) {
+      console.error("Admin login error:", error);
+      toast.error(error.data?.message || "Admin login failed");
     }
   };
 
-  const handleSocialLogin = (provider: 'google' | 'github') => {
+  const handleSocialLogin = (provider: "google" | "github") => {
     const socialUrl = `http://localhost:8000/api/auth/social/${provider}`;
     window.location.href = socialUrl;
   };
+
+  const isLoading = adminLoading || customerLoading;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
@@ -65,7 +93,7 @@ const Login = () => {
               <TabsTrigger value="customer">Customer</TabsTrigger>
               <TabsTrigger value="admin">Admin</TabsTrigger>
             </TabsList>
-            
+
             <TabsContent value="customer">
               <form onSubmit={handleCustomerSubmit} className="space-y-4">
                 <div className="space-y-2">
@@ -75,7 +103,12 @@ const Login = () => {
                     type="email"
                     placeholder="Enter your email"
                     value={customerForm.email}
-                    onChange={(e) => setCustomerForm(prev => ({ ...prev, email: e.target.value }))}
+                    onChange={(e) =>
+                      setCustomerForm((prev) => ({
+                        ...prev,
+                        email: e.target.value,
+                      }))
+                    }
                     required
                   />
                 </div>
@@ -86,7 +119,12 @@ const Login = () => {
                     type="password"
                     placeholder="Enter your password"
                     value={customerForm.password}
-                    onChange={(e) => setCustomerForm(prev => ({ ...prev, password: e.target.value }))}
+                    onChange={(e) =>
+                      setCustomerForm((prev) => ({
+                        ...prev,
+                        password: e.target.value,
+                      }))
+                    }
                     required
                   />
                 </div>
@@ -94,28 +132,30 @@ const Login = () => {
                   {isLoading ? "Signing in..." : "Sign In"}
                 </Button>
               </form>
-              
+
               <div className="mt-4 space-y-2">
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">
                     <span className="w-full border-t" />
                   </div>
                   <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                    <span className="bg-background px-2 text-muted-foreground">
+                      Or continue with
+                    </span>
                   </div>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-2">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => handleSocialLogin('google')}
+                  <Button
+                    variant="outline"
+                    onClick={() => handleSocialLogin("google")}
                     disabled={isLoading}
                   >
                     Google
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => handleSocialLogin('github')}
+                  <Button
+                    variant="outline"
+                    onClick={() => handleSocialLogin("github")}
                     disabled={isLoading}
                   >
                     GitHub
@@ -123,7 +163,7 @@ const Login = () => {
                 </div>
               </div>
             </TabsContent>
-            
+
             <TabsContent value="admin">
               <form onSubmit={handleAdminSubmit} className="space-y-4">
                 <div className="space-y-2">
@@ -133,7 +173,12 @@ const Login = () => {
                     type="email"
                     placeholder="Enter admin email"
                     value={adminForm.email}
-                    onChange={(e) => setAdminForm(prev => ({ ...prev, email: e.target.value }))}
+                    onChange={(e) =>
+                      setAdminForm((prev) => ({
+                        ...prev,
+                        email: e.target.value,
+                      }))
+                    }
                     required
                   />
                 </div>
@@ -144,7 +189,12 @@ const Login = () => {
                     type="password"
                     placeholder="Enter admin password"
                     value={adminForm.password}
-                    onChange={(e) => setAdminForm(prev => ({ ...prev, password: e.target.value }))}
+                    onChange={(e) =>
+                      setAdminForm((prev) => ({
+                        ...prev,
+                        password: e.target.value,
+                      }))
+                    }
                     required
                   />
                 </div>
@@ -154,9 +204,12 @@ const Login = () => {
               </form>
             </TabsContent>
           </Tabs>
-          
+
           <div className="mt-4 text-center text-sm">
-            <Link to="/forgot-password" className="text-primary hover:underline">
+            <Link
+              to="/forgot-password"
+              className="text-primary hover:underline"
+            >
               Forgot your password?
             </Link>
           </div>

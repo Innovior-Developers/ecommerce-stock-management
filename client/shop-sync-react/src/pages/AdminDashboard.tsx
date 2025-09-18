@@ -1,20 +1,20 @@
 import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  getAdminProducts,
-  createAdminProduct,
-  updateAdminProduct,
-  deleteAdminProduct,
-  getAdminCategories,
-  createAdminCategory,
-  updateAdminCategory,
-  deleteAdminCategory,
-  getAdminCustomers,
-  getAdminOrders,
-  getLowStock,
-  getStockLevels,
-  updateStock,
-} from "@/api/Api";
+  useGetProductsQuery,
+  useCreateProductMutation,
+  useUpdateProductMutation,
+  useDeleteProductMutation,
+  useGetCategoriesQuery,
+  useCreateCategoryMutation,
+  useUpdateCategoryMutation,
+  useDeleteCategoryMutation,
+  useGetCustomersQuery,
+  useGetOrdersQuery,
+  useGetLowStockQuery,
+  useGetStockLevelsQuery,
+  useUpdateStockMutation,
+} from "@/store/api/adminApi";
+import { useAppSelector } from "@/store/hooks";
 import {
   Package,
   ShoppingCart,
@@ -49,7 +49,7 @@ import {
 import Header from "@/components/Header";
 import { toast } from "sonner";
 
-// Import the form components
+// Import form components
 import {
   ProductForm,
   ProductCard,
@@ -59,8 +59,6 @@ import {
   CategoryCard,
 } from "@/components/admin forms/Category.form";
 import { InventoryUpdateForm } from "@/components/admin forms/Inventory.form";
-import { DebugPanel } from "@/components/DebugPanel";
-import { TokenDebug } from "@/components/TokenDebug";
 
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
@@ -80,201 +78,47 @@ const AdminDashboard = () => {
   const [customerSearch, setCustomerSearch] = useState("");
   const [categorySearch, setCategorySearch] = useState("");
 
-  const queryClient = useQueryClient();
+  // Get user from Redux state
+  const { user, isAuthenticated } = useAppSelector((state) => state.auth);
 
-  // Queries with better error handling
+  // RTK Query hooks
   const {
     data: productsResponse,
     isLoading: productsLoading,
-    error: productsError,
-  } = useQuery({
-    queryKey: ["admin-products", productSearch],
-    queryFn: () => getAdminProducts({ search: productSearch }),
-    retry: 2,
-    retryDelay: 1000,
-  });
+  } = useGetProductsQuery({ search: productSearch }, { skip: !isAuthenticated });
 
   const {
     data: categoriesResponse,
     isLoading: categoriesLoading,
-    error: categoriesError,
-  } = useQuery({
-    queryKey: ["admin-categories", categorySearch],
-    queryFn: () => getAdminCategories({ search: categorySearch }),
-    retry: 2,
-    retryDelay: 1000,
-  });
+  } = useGetCategoriesQuery({ search: categorySearch }, { skip: !isAuthenticated });
 
   const {
     data: customersResponse,
     isLoading: customersLoading,
-    error: customersError,
-  } = useQuery({
-    queryKey: ["admin-customers", customerSearch],
-    queryFn: () => getAdminCustomers({ search: customerSearch }),
-    retry: 2,
-    retryDelay: 1000,
-  });
+  } = useGetCustomersQuery({ search: customerSearch }, { skip: !isAuthenticated });
 
   const {
     data: ordersResponse,
     isLoading: ordersLoading,
-    error: ordersError,
-  } = useQuery({
-    queryKey: ["admin-orders"],
-    queryFn: () => getAdminOrders(),
-    retry: 2,
-    retryDelay: 1000,
-  });
+  } = useGetOrdersQuery(undefined, { skip: !isAuthenticated });
 
-  const { data: lowStockResponse, error: lowStockError } = useQuery({
-    queryKey: ["low-stock"],
-    queryFn: () => getLowStock(),
-    retry: 2,
-    retryDelay: 1000,
-  });
+  const { data: lowStockResponse } = useGetLowStockQuery(undefined, { skip: !isAuthenticated });
 
   const {
     data: stockLevelsResponse,
     isLoading: stockLevelsLoading,
-    error: stockLevelsError,
-  } = useQuery({
-    queryKey: ["stock-levels"],
-    queryFn: () => getStockLevels(),
-    retry: 2,
-    retryDelay: 1000,
-  });
+  } = useGetStockLevelsQuery(undefined, { skip: !isAuthenticated });
 
-  // Show errors to user
-  if (productsError) {
-    console.error("Products Error:", productsError);
-    toast.error(`Failed to load products: ${productsError.message}`);
-  }
-  if (categoriesError) {
-    console.error("Categories Error:", categoriesError);
-    toast.error(`Failed to load categories: ${categoriesError.message}`);
-  }
-  if (customersError) {
-    console.error("Customers Error:", customersError);
-    toast.error(`Failed to load customers: ${customersError.message}`);
-  }
-  if (ordersError) {
-    console.error("Orders Error:", ordersError);
-    toast.error(`Failed to load orders: ${ordersError.message}`);
-  }
+  // Mutations
+  const [createProduct] = useCreateProductMutation();
+  const [updateProduct] = useUpdateProductMutation();
+  const [deleteProduct] = useDeleteProductMutation();
+  const [createCategory] = useCreateCategoryMutation();
+  const [updateCategory] = useUpdateCategoryMutation();
+  const [deleteCategory] = useDeleteCategoryMutation();
+  const [updateStock] = useUpdateStockMutation();
 
-  // Product mutations
-  const createProductMutation = useMutation({
-    mutationFn: createAdminProduct,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-products"] });
-      queryClient.invalidateQueries({ queryKey: ["stock-levels"] });
-      setIsAddProductOpen(false);
-      toast.success("Product created successfully!");
-    },
-    onError: (error: unknown) => {
-      console.error("Create product error:", error);
-      toast.error(error.message || "Failed to create product");
-    },
-  });
-
-  const updateProductMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: unknown }) =>
-      updateAdminProduct(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-products"] });
-      queryClient.invalidateQueries({ queryKey: ["stock-levels"] });
-      setIsEditProductOpen(false);
-      setSelectedProduct(null);
-      toast.success("Product updated successfully!");
-    },
-    onError: (error: unknown) => {
-      console.error("Update product error:", error);
-      toast.error(error.message || "Failed to update product");
-    },
-  });
-
-  const deleteProductMutation = useMutation({
-    mutationFn: deleteAdminProduct,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-products"] });
-      queryClient.invalidateQueries({ queryKey: ["stock-levels"] });
-      toast.success("Product deleted successfully!");
-    },
-    onError: (error: unknown) => {
-      console.error("Delete product error:", error);
-      toast.error(error.message || "Failed to delete product");
-    },
-  });
-
-  // Category mutations
-  const createCategoryMutation = useMutation({
-    mutationFn: createAdminCategory,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-categories"] });
-      setIsAddCategoryOpen(false);
-      toast.success("Category created successfully!");
-    },
-    onError: (error: unknown) => {
-      console.error("Create category error:", error);
-      toast.error(error.message || "Failed to create category");
-    },
-  });
-
-  const updateCategoryMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: unknown }) =>
-      updateAdminCategory(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-categories"] });
-      setIsEditCategoryOpen(false);
-      setSelectedCategory(null);
-      toast.success("Category updated successfully!");
-    },
-    onError: (error: unknown) => {
-      console.error("Update category error:", error);
-      toast.error(error.message || "Failed to update category");
-    },
-  });
-
-  const deleteCategoryMutation = useMutation({
-    mutationFn: deleteAdminCategory,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-categories"] });
-      toast.success("Category deleted successfully!");
-    },
-    onError: (error: unknown) => {
-      console.error("Delete category error:", error);
-      toast.error(error.message || "Failed to delete category");
-    },
-  });
-
-  // Stock update mutation
-  const updateStockMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: unknown }) =>
-      updateStock(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-products"] });
-      queryClient.invalidateQueries({ queryKey: ["stock-levels"] });
-      queryClient.invalidateQueries({ queryKey: ["low-stock"] });
-      toast.success("Stock updated successfully!");
-    },
-    onError: (error: unknown) => {
-      console.error("Update stock error:", error);
-      toast.error(error.message || "Failed to update stock");
-    },
-  });
-
-  // Extract data with proper fallbacks and logging
-  console.log("Raw API Responses:", {
-    productsResponse,
-    categoriesResponse,
-    customersResponse,
-    ordersResponse,
-    lowStockResponse,
-    stockLevelsResponse,
-  });
-
-  // Updated data extraction to handle different response structures
+  // Extract data with proper fallbacks
   const products = productsResponse?.data?.data || productsResponse?.data || [];
   const categories =
     categoriesResponse?.data?.data || categoriesResponse?.data || [];
@@ -284,14 +128,90 @@ const AdminDashboard = () => {
   const lowStockProducts = lowStockResponse?.data || [];
   const stockLevels = stockLevelsResponse?.data || [];
 
-  console.log("Extracted Data:", {
-    products: products.length,
-    categories: categories.length,
-    customers: customers.length,
-    orders: orders.length,
-    lowStockProducts: lowStockProducts.length,
-    stockLevels: stockLevels.length,
-  });
+  // Handle mutations
+  const handleCreateProduct = async (data: unknown) => {
+    try {
+      await createProduct(data).unwrap();
+      setIsAddProductOpen(false);
+      toast.success("Product created successfully!");
+    } catch (error: unknown) {
+      toast.error(error.data?.message || "Failed to create product");
+    }
+  };
+
+  const handleUpdateProduct = async (id: string, data: unknown) => {
+    try {
+      await updateProduct({ id, data }).unwrap();
+      setIsEditProductOpen(false);
+      setSelectedProduct(null);
+      toast.success("Product updated successfully!");
+    } catch (error: unknown) {
+      toast.error(error.data?.message || "Failed to update product");
+    }
+  };
+
+  const handleDeleteProduct = async (id: string) => {
+    try {
+      await deleteProduct(id).unwrap();
+      toast.success("Product deleted successfully!");
+    } catch (error: unknown) {
+      toast.error(error.data?.message || "Failed to delete product");
+    }
+  };
+
+  const handleCreateCategory = async (data: unknown) => {
+    try {
+      await createCategory(data).unwrap();
+      setIsAddCategoryOpen(false);
+      toast.success("Category created successfully!");
+    } catch (error: unknown) {
+      toast.error(error.data?.message || "Failed to create category");
+    }
+  };
+
+  const handleUpdateCategory = async (id: string, data: unknown) => {
+    try {
+      await updateCategory({ id, data }).unwrap();
+      setIsEditCategoryOpen(false);
+      setSelectedCategory(null);
+      toast.success("Category updated successfully!");
+    } catch (error: unknown) {
+      toast.error(error.data?.message || "Failed to update category");
+    }
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    try {
+      await deleteCategory(id).unwrap();
+      toast.success("Category deleted successfully!");
+    } catch (error: unknown) {
+      toast.error(error.data?.message || "Failed to delete category");
+    }
+  };
+
+  const handleStockUpdate = async (id: string, data: unknown) => {
+    try {
+      await updateStock({ id, data }).unwrap();
+      toast.success("Stock updated successfully!");
+    } catch (error: unknown) {
+      toast.error(error.data?.message || "Failed to update stock");
+    }
+  };
+
+  // Filter data
+  const filteredProducts = products.filter(
+    (product: unknown) =>
+      product.name?.toLowerCase().includes(productSearch.toLowerCase()) ||
+      product.description?.toLowerCase().includes(productSearch.toLowerCase())
+  );
+
+  const filteredCustomers = customers.filter(
+    (customer: unknown) =>
+      customer.user?.name
+        ?.toLowerCase()
+        .includes(customerSearch.toLowerCase()) ||
+      customer.user?.email?.toLowerCase().includes(customerSearch.toLowerCase())
+  );
 
   // Calculate dashboard stats
   const dashboardStats = [
@@ -317,125 +237,51 @@ const AdminDashboard = () => {
       change: "+12.5%",
       trend: "up",
       icon: Users,
-      color: "text-purple-600",
+      color: "text-green-600",
     },
     {
-      title: "Total Orders",
+      title: "Orders",
       value: orders.length.toString(),
-      change: "+15.3%",
+      change: "+8.3%",
       trend: "up",
       icon: ShoppingCart,
-      color: "text-green-600",
+      color: "text-purple-600",
     },
   ];
 
-  // Filter functions
-  const filteredProducts = products.filter(
-    (product: unknown) =>
-      product.name?.toLowerCase().includes(productSearch.toLowerCase()) ||
-      product.sku?.toLowerCase().includes(productSearch.toLowerCase()) ||
-      product.category?.toLowerCase().includes(productSearch.toLowerCase())
-  );
-
-  const filteredCustomers = customers.filter(
-    (customer: unknown) =>
-      customer.user?.name
-        ?.toLowerCase()
-        .includes(customerSearch.toLowerCase()) ||
-      customer.user?.email?.toLowerCase().includes(customerSearch.toLowerCase())
-  );
-
-  const filteredCategories = categories.filter(
-    (category: unknown) =>
-      category.name?.toLowerCase().includes(categorySearch.toLowerCase()) ||
-      category.description?.toLowerCase().includes(categorySearch.toLowerCase())
-  );
-
-  // Event handlers
-  const handleDeleteProduct = (id: string) => {
-    if (confirm("Are you sure you want to delete this product?")) {
-      deleteProductMutation.mutate(id);
-    }
-  };
-
-  const handleDeleteCategory = (id: string) => {
-    if (confirm("Are you sure you want to delete this category?")) {
-      deleteCategoryMutation.mutate(id);
-    }
-  };
-
-  const handleEditProduct = (product: unknown) => {
-    setSelectedProduct(product);
-    setIsEditProductOpen(true);
-  };
-
-  const handleEditCategory = (category: unknown) => {
-    setSelectedCategory(category);
-    setIsEditCategoryOpen(true);
-  };
-
-  const handleViewProduct = (product: unknown) => {
-    toast.info(`Viewing product: ${product.name}`);
-  };
-
-  const handleViewCategory = (category: unknown) => {
-    toast.info(`Viewing category: ${category.name}`);
-  };
-
-  const handleStockUpdate = (productId: string, data: unknown) => {
-    updateStockMutation.mutate({ id: productId, data });
-  };
-
-  // Helper function for status badges
   const getStatusBadge = (status: string) => {
-    const statusMap: Record<string, unknown> = {
-      delivered: { variant: "default", color: "text-green-600" },
-      processing: { variant: "secondary", color: "text-blue-600" },
-      shipped: { variant: "outline", color: "text-orange-600" },
-      pending: { variant: "destructive", color: "text-red-600" },
-      active: { variant: "default", color: "text-green-600" },
-      inactive: { variant: "secondary", color: "text-gray-600" },
-    };
-
-    const config = statusMap[status] || {
-      variant: "secondary",
-      color: "text-gray-600",
+    const variants: Record<string, string> = {
+      active: "bg-green-100 text-green-800",
+      inactive: "bg-red-100 text-red-800",
+      pending: "bg-yellow-100 text-yellow-800",
+      in_stock: "bg-green-100 text-green-800",
+      low_stock: "bg-yellow-100 text-yellow-800",
+      out_of_stock: "bg-red-100 text-red-800",
     };
 
     return (
-      <Badge variant={config.variant} className={config.color}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
+      <Badge className={variants[status] || "bg-gray-100 text-gray-800"}>
+        {status.replace("_", " ").toUpperCase()}
       </Badge>
     );
   };
 
-  // Add this useEffect to handle auth failures
+  // Show toast if not authenticated (logout error)
   useEffect(() => {
-    const hasAuthErrors = [
-      productsError,
-      categoriesError,
-      customersError,
-      ordersError,
-      lowStockError,
-      stockLevelsError,
-    ].some((error) => error?.message === "Unauthenticated.");
-
-    if (hasAuthErrors) {
-      console.warn("🚨 Multiple auth failures detected, redirecting to login");
-      // Clear any remaining auth data
-      localStorage.removeItem("auth_token");
-      localStorage.removeItem("user");
-      // Redirect to login
-      window.location.href = "/login";
+    if (!isAuthenticated) {
+      toast.error("Session expired or unauthorized. Please login again.");
     }
-  }, [
-    productsError,
-    categoriesError,
-    customersError,
-    ordersError,
-    lowStockError,
-    stockLevelsError,
-  ]);
+  }, [isAuthenticated]);
+
+  // Show a loading screen if authentication is not yet confirmed
+  if (!isAuthenticated) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <p className="ml-4">Verifying authentication...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -448,30 +294,24 @@ const AdminDashboard = () => {
             <div>
               <h1 className="text-2xl font-bold">Admin Dashboard</h1>
               <p className="text-muted-foreground">
-                Manage your e-commerce store
+                Welcome back, {user?.name || "Admin"}! Here's what's happening.
               </p>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center space-x-4">
               <Button
-                variant="default"
                 onClick={() => setIsAddProductOpen(true)}
+                className="flex items-center space-x-2"
               >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Product
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setIsAddCategoryOpen(true)}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Category
+                <Plus className="h-4 w-4" />
+                <span>Add Product</span>
               </Button>
             </div>
           </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-6">
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-6">
         <Tabs
           value={activeTab}
           onValueChange={setActiveTab}
@@ -533,22 +373,26 @@ const AdminDashboard = () => {
                       orders.slice(0, 5).map((order: unknown) => (
                         <div
                           key={order._id}
-                          className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                          className="flex items-center justify-between p-3 border rounded-lg"
                         >
-                          <div>
+                          <div className="flex items-center space-x-3">
+                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                            <div>
+                              <p className="font-medium">
+                                Order #{order._id?.slice(-6)}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {order.customer?.name || "Customer"}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right">
                             <p className="font-medium">
-                              {order.order_number ||
-                                `Order #${order._id?.slice(-6)}`}
+                              ${order.total_amount?.toFixed(2) || "0.00"}
                             </p>
                             <p className="text-sm text-muted-foreground">
                               {new Date(order.created_at).toLocaleDateString()}
                             </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-medium">
-                              ${order.total || "0.00"}
-                            </p>
-                            {getStatusBadge(order.status || "pending")}
                           </div>
                         </div>
                       ))
@@ -557,11 +401,11 @@ const AdminDashboard = () => {
                 </CardContent>
               </Card>
 
-              {/* Low Stock Alert */}
+              {/* Low Stock Alerts */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-warning">
-                    <AlertTriangle className="h-5 w-5" />
+                  <CardTitle className="flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-orange-500" />
                     Low Stock Alerts
                   </CardTitle>
                 </CardHeader>
@@ -569,34 +413,25 @@ const AdminDashboard = () => {
                   <div className="space-y-4">
                     {lowStockProducts.length === 0 ? (
                       <div className="text-center py-4 text-muted-foreground">
-                        No low stock items. All products are well stocked!
+                        All products are well stocked!
                       </div>
                     ) : (
-                      lowStockProducts
-                        .slice(0, 5)
-                        .map((product: unknown, index: number) => (
-                          <div
-                            key={index}
-                            className="flex items-center justify-between p-3 bg-warning/10 rounded-lg border border-warning/20"
-                          >
-                            <div>
-                              <p className="font-semibold">{product.name}</p>
-                              <p className="text-sm text-muted-foreground">
-                                SKU: {product.sku}
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-warning font-bold">
-                                {product.current_stock ||
-                                  product.stock_quantity}{" "}
-                                left
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                Status: {product.status}
-                              </p>
-                            </div>
+                      lowStockProducts.slice(0, 5).map((product: unknown) => (
+                        <div
+                          key={product._id}
+                          className="flex items-center justify-between p-3 border border-orange-200 rounded-lg bg-orange-50"
+                        >
+                          <div>
+                            <p className="font-medium">{product.name}</p>
+                            <p className="text-sm text-muted-foreground">
+                              Stock: {product.stock_quantity}
+                            </p>
                           </div>
-                        ))
+                          <Badge variant="outline" className="text-orange-600">
+                            Low Stock
+                          </Badge>
+                        </div>
+                      ))
                     )}
                   </div>
                 </CardContent>
@@ -627,6 +462,10 @@ const AdminDashboard = () => {
                       <Filter className="h-4 w-4" />
                       Filter
                     </Button>
+                    <Button onClick={() => setIsAddProductOpen(true)}>
+                      <Plus className="h-4 w-4" />
+                      Add Product
+                    </Button>
                   </div>
                 </div>
               </CardHeader>
@@ -639,12 +478,15 @@ const AdminDashboard = () => {
                   <div className="text-center py-8">
                     <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                     <h3 className="text-lg font-semibold">No products found</h3>
-                    <p className="text-muted-foreground mb-4">
+                    <p className="text-muted-foreground">
                       {productSearch
                         ? "No products match your search criteria."
-                        : "Start by adding your first product."}
+                        : "Get started by adding your first product."}
                     </p>
-                    <Button onClick={() => setIsAddProductOpen(true)}>
+                    <Button
+                      onClick={() => setIsAddProductOpen(true)}
+                      className="mt-4"
+                    >
                       <Plus className="h-4 w-4 mr-2" />
                       Add Product
                     </Button>
@@ -655,9 +497,11 @@ const AdminDashboard = () => {
                       <ProductCard
                         key={product._id}
                         product={product}
-                        onEdit={handleEditProduct}
-                        onDelete={handleDeleteProduct}
-                        onView={handleViewProduct}
+                        onEdit={(product) => {
+                          setSelectedProduct(product);
+                          setIsEditProductOpen(true);
+                        }}
+                        onDelete={(id) => handleDeleteProduct(id)}
                       />
                     ))}
                   </div>
@@ -673,7 +517,7 @@ const AdminDashboard = () => {
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2">
                     <Tag className="h-5 w-5" />
-                    Category Management ({filteredCategories.length} categories)
+                    Category Management ({categories.length} categories)
                   </CardTitle>
                   <div className="flex items-center gap-2">
                     <div className="relative">
@@ -685,6 +529,10 @@ const AdminDashboard = () => {
                         onChange={(e) => setCategorySearch(e.target.value)}
                       />
                     </div>
+                    <Button onClick={() => setIsAddCategoryOpen(true)}>
+                      <Plus className="h-4 w-4" />
+                      Add Category
+                    </Button>
                   </div>
                 </div>
               </CardHeader>
@@ -693,31 +541,34 @@ const AdminDashboard = () => {
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="h-8 w-8 animate-spin" />
                   </div>
-                ) : filteredCategories.length === 0 ? (
+                ) : categories.length === 0 ? (
                   <div className="text-center py-8">
                     <Tag className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                     <h3 className="text-lg font-semibold">
                       No categories found
                     </h3>
-                    <p className="text-muted-foreground mb-4">
-                      {categorySearch
-                        ? "No categories match your search criteria."
-                        : "Start by adding your first category."}
+                    <p className="text-muted-foreground">
+                      Create categories to organize your products.
                     </p>
-                    <Button onClick={() => setIsAddCategoryOpen(true)}>
+                    <Button
+                      onClick={() => setIsAddCategoryOpen(true)}
+                      className="mt-4"
+                    >
                       <Plus className="h-4 w-4 mr-2" />
                       Add Category
                     </Button>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredCategories.map((category: unknown) => (
+                    {categories.map((category: unknown) => (
                       <CategoryCard
                         key={category._id}
                         category={category}
-                        onEdit={handleEditCategory}
-                        onDelete={handleDeleteCategory}
-                        onView={handleViewCategory}
+                        onEdit={(category) => {
+                          setSelectedCategory(category);
+                          setIsEditCategoryOpen(true);
+                        }}
+                        onDelete={(id) => handleDeleteCategory(id)}
                       />
                     ))}
                   </div>
@@ -732,7 +583,7 @@ const AdminDashboard = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <BarChart3 className="h-5 w-5" />
-                  Inventory Management ({products.length} products)
+                  Inventory Management
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -755,7 +606,7 @@ const AdminDashboard = () => {
                         key={product._id}
                         product={product}
                         onStockUpdate={handleStockUpdate}
-                        isUpdating={updateStockMutation.isPending}
+                        isUpdating={false}
                       />
                     ))}
                   </div>
@@ -816,27 +667,34 @@ const AdminDashboard = () => {
                       {orders.slice(0, 10).map((order: unknown) => (
                         <TableRow key={order._id}>
                           <TableCell className="font-mono">
-                            {order.order_number || `#${order._id?.slice(-6)}`}
+                            #{order._id?.slice(-6)}
                           </TableCell>
                           <TableCell>
-                            {order.customer?.user?.name || "Unknown Customer"}
+                            <div>
+                              <p className="font-medium">
+                                {order.customer?.name || "Unknown"}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {order.customer?.email || "No email"}
+                              </p>
+                            </div>
                           </TableCell>
                           <TableCell>
                             {getStatusBadge(order.status || "pending")}
                           </TableCell>
                           <TableCell className="font-semibold">
-                            ${order.total || "0.00"}
+                            ${order.total_amount?.toFixed(2) || "0.00"}
                           </TableCell>
                           <TableCell>
                             {new Date(order.created_at).toLocaleDateString()}
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Button variant="outline" size="sm">
-                                View
+                            <div className="flex items-center space-x-2">
+                              <Button variant="ghost" size="sm">
+                                <Eye className="h-4 w-4" />
                               </Button>
-                              <Button variant="outline" size="sm">
-                                Edit
+                              <Button variant="ghost" size="sm">
+                                <Edit className="h-4 w-4" />
                               </Button>
                             </div>
                           </TableCell>
@@ -970,14 +828,11 @@ const AdminDashboard = () => {
                               : "Never"}
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Button variant="outline" size="sm">
+                            <div className="flex items-center space-x-2">
+                              <Button variant="ghost" size="sm">
                                 <Eye className="h-4 w-4" />
                               </Button>
-                              <Button variant="outline" size="sm">
-                                <Mail className="h-4 w-4" />
-                              </Button>
-                              <Button variant="outline" size="sm">
+                              <Button variant="ghost" size="sm">
                                 <Edit className="h-4 w-4" />
                               </Button>
                             </div>
@@ -991,49 +846,48 @@ const AdminDashboard = () => {
             </Card>
           </TabsContent>
         </Tabs>
-      </div>
+      </main>
 
-      {/* Form Dialogs */}
+      {/* Forms */}
       <ProductForm
         isOpen={isAddProductOpen}
         onOpenChange={setIsAddProductOpen}
+        onSubmit={handleCreateProduct}
         categories={categories}
-        onSubmit={(data) => createProductMutation.mutate(data)}
-        isLoading={createProductMutation.isPending}
         mode="create"
       />
 
       <ProductForm
         isOpen={isEditProductOpen}
-        onOpenChange={setIsEditProductOpen}
+        onOpenChange={(open) => {
+          setIsEditProductOpen(open);
+          if (!open) setSelectedProduct(null);
+        }}
+        onUpdate={(id, data) => handleUpdateProduct(id, data)}
         product={selectedProduct}
         categories={categories}
-        onUpdate={(id, data) => updateProductMutation.mutate({ id, data })}
-        isLoading={updateProductMutation.isPending}
         mode="edit"
       />
 
       <CategoryForm
         isOpen={isAddCategoryOpen}
         onOpenChange={setIsAddCategoryOpen}
-        categories={categories}
-        onSubmit={(data) => createCategoryMutation.mutate(data)}
-        isLoading={createCategoryMutation.isPending}
+        onSubmit={handleCreateCategory}
+        categories={categories || []} // ✅ Provide fallback
         mode="create"
       />
 
       <CategoryForm
         isOpen={isEditCategoryOpen}
-        onOpenChange={setIsEditCategoryOpen}
-        category={selectedCategory}
-        categories={categories}
-        onUpdate={(id, data) => updateCategoryMutation.mutate({ id, data })}
-        isLoading={updateCategoryMutation.isPending}
+        onOpenChange={(open) => {
+          setIsEditCategoryOpen(open);
+          if (!open) setSelectedCategory(null);
+        }}
+        onUpdate={(id, data) => handleUpdateCategory(id, data)}
+        category={selectedCategory} // ✅ Correct prop name
+        categories={categories || []} // ✅ Provide fallback
         mode="edit"
       />
-
-      <DebugPanel />
-      <TokenDebug />
     </div>
   );
 };

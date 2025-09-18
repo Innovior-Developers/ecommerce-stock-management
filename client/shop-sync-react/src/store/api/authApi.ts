@@ -17,87 +17,37 @@ export interface RegisterData {
   phone?: string;
 }
 
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: "admin" | "customer";
-  avatar?: string;
-  provider?: string;
-}
-
 export interface AuthResponse {
   success: boolean;
   message: string;
-  user: User;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    role: "admin" | "customer";
+    avatar?: string;
+  };
   token: string;
   refresh_token?: string;
   token_type: string;
   expires_in?: number;
 }
 
-// Base query with automatic token handling
-const authBaseQuery = fetchBaseQuery({
-  baseUrl: "http://localhost:8000/api/auth",
-  prepareHeaders: (headers, { getState }) => {
-    const token = (getState() as RootState).auth.token;
-    if (token) {
-      headers.set("authorization", `Bearer ${token}`);
-    }
-    headers.set("accept", "application/json");
-    headers.set("content-type", "application/json");
-    return headers;
-  },
-});
-
-// Enhanced base query with automatic token refresh
-const authBaseQueryWithReauth = async (
-  args: unknown,
-  api: unknown,
-  extraOptions: unknown
-) => {
-  let result = await authBaseQuery(args, api, extraOptions);
-
-  if (result.error && result.error.status === 401) {
-    console.log("🔄 Token expired, attempting refresh...");
-
-    // Try to refresh token
-    const refreshResult = await authBaseQuery(
-      { url: "/refresh", method: "POST" },
-      api,
-      extraOptions
-    );
-
-    if (refreshResult.data) {
-      const refreshData = refreshResult.data as AuthResponse;
-      if (refreshData.success) {
-        // Store new token
-        api.dispatch(
-          setCredentials({
-            user: refreshData.user,
-            token: refreshData.token,
-            refreshToken: refreshData.refresh_token,
-          })
-        );
-
-        // Retry original request with new token
-        result = await authBaseQuery(args, api, extraOptions);
-      } else {
-        // Refresh failed, clear credentials
-        api.dispatch(clearCredentials());
-      }
-    } else {
-      // Refresh failed, clear credentials
-      api.dispatch(clearCredentials());
-    }
-  }
-
-  return result;
-};
-
 export const authApi = createApi({
   reducerPath: "authApi",
-  baseQuery: authBaseQueryWithReauth,
+  baseQuery: fetchBaseQuery({
+    baseUrl: "http://localhost:8000/api/auth",
+    prepareHeaders: (headers, { getState }) => {
+      const token = (getState() as RootState).auth.token;
+      if (token) {
+        headers.set("authorization", `Bearer ${token}`);
+      }
+      // ✅ Add these two headers
+      headers.set("Accept", "application/json");
+      headers.set("Content-Type", "application/json");
+      return headers;
+    },
+  }),
   tagTypes: ["User"],
   endpoints: (builder) => ({
     // Admin login
@@ -176,7 +126,7 @@ export const authApi = createApi({
     }),
 
     // Get current user
-    getCurrentUser: builder.query<{ success: boolean; user: User }, void>({
+    getCurrentUser: builder.query<{ success: boolean; user: unknown }, void>({
       query: () => "/user",
       providesTags: ["User"],
     }),
@@ -193,7 +143,6 @@ export const authApi = createApi({
           dispatch(clearCredentials());
         } catch (error) {
           // Clear credentials even if API call fails
-          console.warn("Logout API failed, clearing local data anyway");
           dispatch(clearCredentials());
         }
       },
@@ -233,10 +182,3 @@ export const {
   useLogoutMutation,
   useRefreshTokenMutation,
 } = authApi;
-
-// Legacy compatibility functions (if needed for gradual migration)
-export const authService = {
-  getSocialLoginUrl: (provider: "google" | "github") => {
-    return `http://localhost:8000/api/auth/social/${provider}`;
-  },
-};

@@ -1,10 +1,18 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAuth } from "@/contexts/AuthContext";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { useCustomerRegisterMutation } from "@/store/api/authApi";
+import { useAppSelector } from "@/store/hooks";
+import { toast } from "sonner";
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -16,35 +24,45 @@ const Register = () => {
     last_name: "",
     phone: "",
   });
-  const [isLoading, setIsLoading] = useState(false);
-  
-  const { register } = useAuth();
+
+  const [customerRegister, { isLoading }] = useCustomerRegisterMutation();
+  const { isAuthenticated } = useAppSelector((state) => state.auth);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const from = location.state?.from?.pathname || "/";
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate(from, { replace: true });
+    }
+  }, [isAuthenticated, navigate, from]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value,
     }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (formData.password !== formData.password_confirmation) {
       toast.error("Passwords don't match");
       return;
     }
-    
-    setIsLoading(true);
-    
+
     try {
-      await register(formData);
-      navigate('/', { replace: true });
-    } catch (error) {
-      console.error('Registration error:', error);
-    } finally {
-      setIsLoading(false);
+      const response = await customerRegister(formData).unwrap();
+      if (response.success) {
+        toast.success("Registration successful!");
+        navigate(from, { replace: true });
+      }
+    } catch (error: unknown) {
+      console.error("Registration error:", error);
+      toast.error(error.data?.message || "Registration failed");
     }
   };
 
@@ -68,7 +86,7 @@ const Register = () => {
                 required
               />
             </div>
-            
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="first_name">First Name</Label>
@@ -91,7 +109,7 @@ const Register = () => {
                 />
               </div>
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -104,7 +122,7 @@ const Register = () => {
                 required
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="phone">Phone (Optional)</Label>
               <Input
@@ -116,7 +134,7 @@ const Register = () => {
                 onChange={handleChange}
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <Input
@@ -129,7 +147,7 @@ const Register = () => {
                 required
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="password_confirmation">Confirm Password</Label>
               <Input
@@ -142,12 +160,12 @@ const Register = () => {
                 required
               />
             </div>
-            
+
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Creating Account..." : "Create Account"}
             </Button>
           </form>
-          
+
           <div className="mt-4 text-center text-sm">
             Already have an account?{" "}
             <Link to="/login" className="text-primary hover:underline">

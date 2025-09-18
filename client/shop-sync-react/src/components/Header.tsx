@@ -1,16 +1,5 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import {
-  Search,
-  ShoppingCart,
-  User,
-  Menu,
-  X,
-  Heart,
-  LogOut,
-  Settings,
-  Package,
-} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -18,246 +7,238 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useAuth } from "@/contexts/AuthContext";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Search,
+  ShoppingCart,
+  User,
+  Menu,
+  Heart,
+  Settings,
+  LogOut,
+  Shield,
+} from "lucide-react";
+import { useAppSelector } from "@/store/hooks";
+import { useLogoutMutation } from "@/store/api/authApi";
+import { toast } from "sonner";
 
-const Header = ({ isAdmin = false }) => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [cartCount] = useState(0);
-  const { user, isAuthenticated, logout } = useAuth();
+interface HeaderProps {
+  isAdmin?: boolean;
+}
+
+const Header = ({ isAdmin = false }: HeaderProps) => {
+  const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
 
-  const handleLogout = async () => {
-    try {
-      await logout();
-      navigate(isAdmin ? "/login" : "/");
-    } catch (error) {
-      console.error("Logout failed:", error);
+  const { isAuthenticated, user } = useAppSelector((state) => state.auth);
+  const [logout, { isLoading: isLoggingOut }] = useLogoutMutation();
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
     }
   };
 
-  const navItems = isAdmin
-    ? [
-        { label: "Home", href: "/" },
-        { label: "Dashboard", href: "/admin" },
-        // { label: "Products", href: "/admin/products" },
-        // { label: "Categories", href: "/admin/categories" },
-        // { label: "Orders", href: "/admin/orders" },
-        // { label: "Customers", href: "/admin/customers" },
-      ]
-    : [
-        { label: "Home", href: "/" },
-        { label: "Shop", href: "/shop" },
-        { label: "Electronics", href: "/category/electronics" },
-        { label: "Fashion", href: "/category/fashion" },
-        { label: "Home & Garden", href: "/category/home" },
-        { label: "Deals", href: "/deals" },
-        { label: "About", href: "/about" },
-        { label: "Contact", href: "/contact" },
-      ];
+  const handleLogout = async () => {
+    try {
+      await logout().unwrap();
+      toast.success("Logged out successfully");
+      navigate("/");
+    } catch (error: unknown) {
+      // Show error message if 401
+      if (error?.status === 401) {
+        toast.error(
+          error?.data?.message || "Session expired. You have been logged out."
+        );
+        navigate("/login");
+      } else {
+        toast.error("Logout failed");
+      }
+    }
+  };
+
+  const cartItemsCount = 2; // This would come from cart state
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-4">
-        {/* Top bar */}
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
-          <div className="flex items-center space-x-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="md:hidden"
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-            >
-              {isMenuOpen ? (
-                <X className="h-5 w-5" />
-              ) : (
-                <Menu className="h-5 w-5" />
-              )}
-            </Button>
-
-            <Link
-              to={isAdmin ? "/admin" : "/"}
-              className="flex items-center space-x-2"
-            >
-              <div className="h-8 w-8 bg-gradient-primary rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">E</span>
-              </div>
-              <span className="text-xl font-bold bg-gradient-hero bg-clip-text text-transparent">
-                EliteStore
+          <Link to="/" className="flex items-center space-x-2">
+            <div className="h-8 w-8 bg-primary rounded-md flex items-center justify-center">
+              <span className="text-primary-foreground font-bold text-sm">
+                S
               </span>
-            </Link>
-          </div>
+            </div>
+            <span className="font-bold text-xl">ShopSync</span>
+          </Link>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-6">
-            {navItems.map((item) => (
+          {/* Search Bar - Hidden on mobile */}
+          {!isAdmin && (
+            <form
+              onSubmit={handleSearch}
+              className="hidden md:flex flex-1 max-w-md mx-8"
+            >
+              <div className="relative w-full">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <Input
+                  type="search"
+                  placeholder="Search products..."
+                  className="pl-10 pr-4"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+            </form>
+          )}
+
+          {/* Navigation Links */}
+          <nav className="flex items-center space-x-4">
+            <Link to="/shop" className="hover:underline">
+              Shop
+            </Link>
+            <Link to="/deals" className="hover:underline">
+              Deals
+            </Link>
+            <Link to="/about" className="hover:underline">
+              About
+            </Link>
+            <Link to="/contact" className="hover:underline">
+              Contact
+            </Link>
+            {isAuthenticated && user?.role === "admin" && (
               <Link
-                key={item.label}
-                to={item.href}
-                className="text-sm font-medium text-foreground hover:text-primary transition-colors"
+                to="/admin"
+                className="hover:underline text-primary font-semibold"
               >
-                {item.label}
+                Admin
               </Link>
-            ))}
+            )}
           </nav>
 
-          {/* Search and Actions */}
+          {/* Navigation Icons */}
           <div className="flex items-center space-x-4">
-            {/* Search - Hidden on mobile */}
-            <div className="hidden md:flex relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Search products..."
-                className="pl-10 w-64 focus-ring"
-              />
-            </div>
+            {!isAdmin && (
+              <>
+                {/* Wishlist */}
+                <Button variant="ghost" size="icon" asChild>
+                  <Link to="/wishlist">
+                    <Heart className="h-5 w-5" />
+                    <span className="sr-only">Wishlist</span>
+                  </Link>
+                </Button>
 
-            {/* Action buttons */}
-            <div className="flex items-center space-x-2">
-              {/* Wishlist */}
-              <Button variant="ghost" size="icon" className="focus-ring">
-                <Heart className="h-5 w-5" />
-              </Button>
-
-              {/* Cart */}
-              {isAuthenticated && (
-                <Link to="/cart">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="relative focus-ring"
-                  >
+                {/* Cart */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="relative"
+                  asChild
+                >
+                  <Link to="/cart">
                     <ShoppingCart className="h-5 w-5" />
-                    {cartCount > 0 && (
+                    {cartItemsCount > 0 && (
                       <Badge
                         variant="destructive"
                         className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
                       >
-                        {cartCount}
+                        {cartItemsCount}
                       </Badge>
                     )}
+                    <span className="sr-only">Shopping cart</span>
+                  </Link>
+                </Button>
+              </>
+            )}
+
+            {/* User Menu */}
+            {isAuthenticated ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="relative h-8 w-8 rounded-full"
+                  >
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={user?.avatar} alt={user?.name} />
+                      <AvatarFallback>
+                        {user?.name?.charAt(0)?.toUpperCase() || "U"}
+                      </AvatarFallback>
+                    </Avatar>
                   </Button>
-                </Link>
-              )}
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56" align="end" forceMount>
+                  <div className="flex items-center justify-start gap-2 p-2">
+                    <div className="flex flex-col space-y-1 leading-none">
+                      <p className="font-medium">{user?.name}</p>
+                      <p className="w-48 truncate text-sm text-muted-foreground">
+                        {user?.email}
+                      </p>
+                    </div>
+                  </div>
+                  <DropdownMenuSeparator />
 
-              {/* User Menu */}
-              {isAuthenticated ? (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="focus-ring">
-                      <User className="h-5 w-5" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    <DropdownMenuLabel>
-                      <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-medium">{user?.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {user?.email}
-                        </p>
-                      </div>
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
+                  {user?.role === "admin" && (
+                    <>
+                      <DropdownMenuItem asChild>
+                        <Link to="/admin" className="flex items-center">
+                          <Shield className="mr-2 h-4 w-4" />
+                          Admin Dashboard
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
 
+                  <DropdownMenuItem asChild>
+                    <Link to="/profile" className="flex items-center">
+                      <User className="mr-2 h-4 w-4" />
+                      Profile
+                    </Link>
+                  </DropdownMenuItem>
+
+                  {!isAdmin && (
                     <DropdownMenuItem asChild>
-                      <Link to="/profile" className="cursor-pointer">
+                      <Link to="/orders" className="flex items-center">
                         <Settings className="mr-2 h-4 w-4" />
-                        Profile Settings
+                        Orders
                       </Link>
                     </DropdownMenuItem>
+                  )}
 
-                    <DropdownMenuItem asChild>
-                      <Link to="/orders" className="cursor-pointer">
-                        <Package className="mr-2 h-4 w-4" />
-                        My Orders
-                      </Link>
-                    </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handleLogout}
+                    disabled={isLoggingOut}
+                    className="flex items-center text-red-600"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    {isLoggingOut ? "Logging out..." : "Log out"}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <div className="flex items-center space-x-2">
+                <Button variant="ghost" asChild>
+                  <Link to="/login">Login</Link>
+                </Button>
+                <Button asChild>
+                  <Link to="/register">Sign Up</Link>
+                </Button>
+              </div>
+            )}
 
-                    {user?.role === "admin" && (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem asChild>
-                          <Link to="/admin" className="cursor-pointer">
-                            <Settings className="mr-2 h-4 w-4" />
-                            Admin Dashboard
-                          </Link>
-                        </DropdownMenuItem>
-                      </>
-                    )}
-
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={handleLogout}
-                      className="cursor-pointer"
-                    >
-                      <LogOut className="mr-2 h-4 w-4" />
-                      Sign Out
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              ) : (
-                <div className="flex items-center space-x-2">
-                  <Link to="/login">
-                    <Button variant="ghost" size="sm">
-                      Sign In
-                    </Button>
-                  </Link>
-                  <Link to="/register">
-                    <Button size="sm">Sign Up</Button>
-                  </Link>
-                </div>
-              )}
-            </div>
+            {/* Mobile menu */}
+            <Button variant="ghost" size="icon" className="md:hidden">
+              <Menu className="h-5 w-5" />
+              <span className="sr-only">Menu</span>
+            </Button>
           </div>
         </div>
-
-        {/* Mobile menu */}
-        {isMenuOpen && (
-          <div className="md:hidden border-t bg-background">
-            <nav className="flex flex-col space-y-4 p-4">
-              {/* Mobile search */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Search products..."
-                  className="pl-10 focus-ring"
-                />
-              </div>
-
-              {/* Mobile nav items */}
-              {navItems.map((item) => (
-                <Link
-                  key={item.label}
-                  to={item.href}
-                  className="text-sm font-medium text-foreground hover:text-primary transition-colors py-2"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  {item.label}
-                </Link>
-              ))}
-
-              {/* Mobile auth actions */}
-              {!isAuthenticated && (
-                <div className="flex flex-col space-y-2 pt-4 border-t">
-                  <Link to="/login" onClick={() => setIsMenuOpen(false)}>
-                    <Button variant="ghost" className="w-full justify-start">
-                      Sign In
-                    </Button>
-                  </Link>
-                  <Link to="/register" onClick={() => setIsMenuOpen(false)}>
-                    <Button className="w-full">Sign Up</Button>
-                  </Link>
-                </div>
-              )}
-            </nav>
-          </div>
-        )}
       </div>
     </header>
   );

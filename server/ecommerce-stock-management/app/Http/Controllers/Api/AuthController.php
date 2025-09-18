@@ -40,8 +40,12 @@ class AuthController extends Controller
             ], 403);
         }
 
+        // Clear old tokens
         $user->tokens()->delete();
-        $token = $user->createToken('admin-token', ['admin'])->plainTextToken;
+
+        // Create new tokens with longer expiry
+        $accessToken = $user->createToken('admin-token', ['admin']);
+        $refreshToken = $user->createToken('admin-refresh-token', ['refresh']);
 
         return response()->json([
             'success' => true,
@@ -52,8 +56,45 @@ class AuthController extends Controller
                 'email' => $user->email,
                 'role' => $user->role,
             ],
-            'token' => $token,
+            'token' => $accessToken->plainTextToken,
+            'refresh_token' => $refreshToken->plainTextToken,
             'token_type' => 'Bearer',
+            'expires_in' => 86400, // 24 hours
+        ]);
+    }
+
+    // Add token refresh endpoint
+    public function refreshToken(Request $request)
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid refresh token',
+            ], 401);
+        }
+
+        // Delete current tokens
+        $user->tokens()->delete();
+
+        // Create new tokens
+        $accessToken = $user->createToken(
+            $user->role . '-token',
+            $user->role === 'admin' ? ['admin'] : ['customer']
+        );
+        $refreshToken = $user->createToken(
+            $user->role . '-refresh-token',
+            ['refresh']
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Token refreshed successfully',
+            'token' => $accessToken->plainTextToken,
+            'refresh_token' => $refreshToken->plainTextToken,
+            'token_type' => 'Bearer',
+            'expires_in' => 86400,
         ]);
     }
 

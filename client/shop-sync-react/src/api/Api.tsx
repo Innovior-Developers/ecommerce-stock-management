@@ -1,6 +1,8 @@
 /* eslint-disable react-refresh/only-export-components */
 import axios, { AxiosInstance, AxiosRequestConfig } from "axios";
 import { API_CONFIG } from "./config";
+import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+import type { RootState } from "../index";
 
 export interface ApiResponse<T = unknown> {
   success: boolean;
@@ -8,7 +10,9 @@ export interface ApiResponse<T = unknown> {
   data?: T;
   user?: unknown;
   token?: string;
+  refresh_token?: string;
   token_type?: string;
+  expires_in?: number;
 }
 
 export interface ApiError {
@@ -19,7 +23,8 @@ export interface ApiError {
 
 class ApiService {
   private api: AxiosInstance;
-  private isTokenCleared = false; // Add this flag
+  private isTokenCleared = false;
+  private isRefreshing = false;
 
   constructor() {
     this.api = axios.create({
@@ -32,17 +37,52 @@ class ApiService {
   }
 
   private setupInterceptors() {
-    // Request interceptor to add auth token
+    // Request interceptor to add auth token and auto-refresh
     this.api.interceptors.request.use(
-      (config) => {
+      async (config) => {
         const token = localStorage.getItem("auth_token");
 
         if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
+          // Check if token needs refresh before making request
+          const tokenExpiry = localStorage.getItem("token_expiry");
+          if (tokenExpiry) {
+            const fiveMinutesFromNow = Date.now() + 5 * 60 * 1000;
+            const expiryTime = parseInt(tokenExpiry);
+
+            if (
+              expiryTime <= fiveMinutesFromNow &&
+              !this.isRefreshing &&
+              !config.url?.includes("/auth/refresh")
+            ) {
+              try {
+                this.isRefreshing = true;
+                console.log("🔄 Auto-refreshing token before request");
+
+                const { authService } = await import("./Auth");
+                await authService.refreshToken();
+
+                // Get the new token
+                const newToken = localStorage.getItem("auth_token");
+                if (newToken) {
+                  config.headers.Authorization = `Bearer ${newToken}`;
+                }
+              } catch (error) {
+                console.error("Auto token refresh failed:", error);
+                // Continue with original token
+                config.headers.Authorization = `Bearer ${token}`;
+              } finally {
+                this.isRefreshing = false;
+              }
+            } else {
+              config.headers.Authorization = `Bearer ${token}`;
+            }
+          } else {
+            config.headers.Authorization = `Bearer ${token}`;
+          }
+
           console.log(
             `🔐 Token added to ${config.method?.toUpperCase()} ${config.url}`
           );
-          // Reset the flag when we have a token
           this.isTokenCleared = false;
         } else {
           const protectedEndpoints = ["/admin/", "/auth/logout", "/auth/user"];
@@ -63,7 +103,7 @@ class ApiService {
       (error) => Promise.reject(error)
     );
 
-    // Response interceptor to handle common errors
+    // Response interceptor to handle 401 errors
     this.api.interceptors.response.use(
       (response) => {
         console.log(
@@ -72,35 +112,61 @@ class ApiService {
         );
         return response;
       },
-      (error) => {
+      async (error) => {
         console.error(`❌ API Error Response:`, error.response?.data);
 
         if (error.response?.status === 401) {
           const isLogoutEndpoint = error.config?.url?.includes("/auth/logout");
+          const isRefreshEndpoint =
+            error.config?.url?.includes("/auth/refresh");
 
           if (isLogoutEndpoint) {
             console.log(
               "ℹ️ 401 on logout endpoint is expected when token is already cleared"
             );
-          } else if (!this.isTokenCleared) {
-            // Only clear token once to prevent cascade
-            console.warn(
-              "🚨 401 Unauthorized - clearing invalid token (first time)"
-            );
+          } else if (isRefreshEndpoint) {
+            console.warn("🚨 Refresh token failed, clearing auth data");
             this.isTokenCleared = true;
             localStorage.removeItem("auth_token");
+            localStorage.removeItem("refresh_token");
             localStorage.removeItem("user");
+            localStorage.removeItem("token_expiry");
 
-            // Optionally redirect to login after a delay to prevent immediate cascade
             setTimeout(() => {
               if (window.location.pathname.includes("/admin")) {
                 window.location.href = "/login";
               }
             }, 1000);
-          } else {
-            console.log(
-              "🔄 401 Unauthorized - token already cleared, skipping"
-            );
+          } else if (!this.isTokenCleared && !this.isRefreshing) {
+            console.warn("🔄 401 Unauthorized - attempting token refresh");
+
+            try {
+              this.isRefreshing = true;
+              const { authService } = await import("./Auth");
+              await authService.refreshToken();
+
+              // Retry the original request with new token
+              const newToken = localStorage.getItem("auth_token");
+              if (newToken && error.config) {
+                error.config.headers.Authorization = `Bearer ${newToken}`;
+                return this.api.request(error.config);
+              }
+            } catch (refreshError) {
+              console.error("Token refresh failed:", refreshError);
+              this.isTokenCleared = true;
+              localStorage.removeItem("auth_token");
+              localStorage.removeItem("refresh_token");
+              localStorage.removeItem("user");
+              localStorage.removeItem("token_expiry");
+
+              setTimeout(() => {
+                if (window.location.pathname.includes("/admin")) {
+                  window.location.href = "/login";
+                }
+              }, 1000);
+            } finally {
+              this.isRefreshing = false;
+            }
           }
         }
         return Promise.reject(error);
@@ -168,135 +234,200 @@ class ApiService {
     }
   }
 
-  private handleError(error: unknown): ApiError {
-    console.error("API Error:", error);
-
+  private handleError(error: unknown): never {
     if (axios.isAxiosError(error)) {
-      if (error.response) {
-        // Server responded with error status
-        return {
-          success: false,
-          message:
-            error.response.data?.message ||
-            `Server error: ${error.response.status}`,
-          errors: error.response.data?.errors,
-        };
-      } else if (error.request) {
-        // Network error
-        return {
-          success: false,
-          message:
-            "Network error. Please check your connection and ensure the backend server is running at http://localhost:8000",
-        };
-      } else if (error.code === "ECONNABORTED") {
-        // Timeout error
-        return {
-          success: false,
-          message:
-            "Request timeout. Please check if the backend server is running and responding.",
-        };
-      }
+      const apiError: ApiError = {
+        success: false,
+        message:
+          error.response?.data?.message || error.message || "An error occurred",
+        errors: error.response?.data?.errors,
+      };
+      throw apiError;
     }
-
-    return {
-      success: false,
-      message:
-        error instanceof Error ? error.message : "An unexpected error occurred",
-    };
-  }
-
-  // Health check method
-  async healthCheck(): Promise<ApiResponse> {
-    return this.get("/health");
+    throw error;
   }
 }
 
 export const apiService = new ApiService();
 
-// Products API
-export async function getAdminProducts(params?: unknown) {
-  console.log("Calling getAdminProducts with params:", params);
-  return apiService.get("/admin/products", { params });
-}
+const adminBaseQuery = fetchBaseQuery({
+  baseUrl: "http://localhost:8000/api/admin",
+  prepareHeaders: (headers, { getState }) => {
+    const token = (getState() as RootState).auth.token;
+    if (token) {
+      headers.set("authorization", `Bearer ${token}`);
+    }
+    headers.set("accept", "application/json");
+    headers.set("content-type", "application/json");
+    return headers;
+  },
+});
 
-export async function createAdminProduct(data: unknown) {
-  console.log("Calling createAdminProduct with data:", data);
-  return apiService.post("/admin/products", data);
-}
+export const adminApi = createApi({
+  reducerPath: "adminApi",
+  baseQuery: adminBaseQuery,
+  tagTypes: ["Product", "Category", "Customer", "Order", "Inventory"],
+  endpoints: (builder) => ({
+    // Products
+    getProducts: builder.query<unknown, { search?: string }>({
+      query: ({ search }) => ({
+        url: "/products",
+        params: search ? { search } : {},
+      }),
+      providesTags: ["Product"],
+    }),
 
-export async function updateAdminProduct(id: string, data: unknown) {
-  console.log("Calling updateAdminProduct with id:", id, "data:", data);
-  return apiService.put(`/admin/products/${id}`, data);
-}
+    createProduct: builder.mutation<unknown, unknown>({
+      query: (productData) => ({
+        url: "/products",
+        method: "POST",
+        body: productData,
+      }),
+      invalidatesTags: ["Product", "Inventory"],
+    }),
 
-export async function deleteAdminProduct(id: string) {
-  console.log("Calling deleteAdminProduct with id:", id);
-  return apiService.delete(`/admin/products/${id}`);
-}
+    updateProduct: builder.mutation<unknown, { id: string; data: unknown }>({
+      query: ({ id, data }) => ({
+        url: `/products/${id}`,
+        method: "PUT",
+        body: data,
+      }),
+      invalidatesTags: ["Product", "Inventory"],
+    }),
 
-// Categories API
-export async function getAdminCategories(params?: unknown) {
-  console.log("Calling getAdminCategories with params:", params);
-  return apiService.get("/admin/categories", { params });
-}
+    deleteProduct: builder.mutation<unknown, string>({
+      query: (id) => ({
+        url: `/products/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["Product", "Inventory"],
+    }),
 
-export async function createAdminCategory(data: unknown) {
-  console.log("Calling createAdminCategory with data:", data);
-  return apiService.post("/admin/categories", data);
-}
+    // Categories
+    getCategories: builder.query<unknown, { search?: string }>({
+      query: ({ search }) => ({
+        url: "/categories",
+        params: search ? { search } : {},
+      }),
+      providesTags: ["Category"],
+    }),
 
-export async function updateAdminCategory(id: string, data: unknown) {
-  console.log("Calling updateAdminCategory with id:", id, "data:", data);
-  return apiService.put(`/admin/categories/${id}`, data);
-}
+    createCategory: builder.mutation<unknown, unknown>({
+      query: (categoryData) => ({
+        url: "/categories",
+        method: "POST",
+        body: categoryData,
+      }),
+      invalidatesTags: ["Category"],
+    }),
 
-export async function deleteAdminCategory(id: string) {
-  console.log("Calling deleteAdminCategory with id:", id);
-  return apiService.delete(`/admin/categories/${id}`);
-}
+    updateCategory: builder.mutation<unknown, { id: string; data: unknown }>({
+      query: ({ id, data }) => ({
+        url: `/categories/${id}`,
+        method: "PUT",
+        body: data,
+      }),
+      invalidatesTags: ["Category"],
+    }),
 
-// Customers API
-export async function getAdminCustomers(params?: unknown) {
-  console.log("Calling getAdminCustomers with params:", params);
-  return apiService.get("/admin/customers", { params });
-}
+    deleteCategory: builder.mutation<unknown, string>({
+      query: (id) => ({
+        url: `/categories/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["Category"],
+    }),
 
-export async function updateAdminCustomer(id: string, data: unknown) {
-  return apiService.put(`/admin/customers/${id}`, data);
-}
+    // Customers
+    getCustomers: builder.query<unknown, { search?: string }>({
+      query: ({ search }) => ({
+        url: "/customers",
+        params: search ? { search } : {},
+      }),
+      providesTags: ["Customer"],
+    }),
 
-export async function deleteAdminCustomer(id: string) {
-  return apiService.delete(`/admin/customers/${id}`);
-}
+    updateCustomer: builder.mutation<unknown, { id: string; data: unknown }>({
+      query: ({ id, data }) => ({
+        url: `/customers/${id}`,
+        method: "PUT",
+        body: data,
+      }),
+      invalidatesTags: ["Customer"],
+    }),
 
-// Orders API
-export async function getAdminOrders(params?: unknown) {
-  console.log("Calling getAdminOrders with params:", params);
-  return apiService.get("/admin/orders", { params });
-}
+    deleteCustomer: builder.mutation<unknown, string>({
+      query: (id) => ({
+        url: `/customers/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["Customer"],
+    }),
 
-export async function updateAdminOrder(id: string, data: unknown) {
-  return apiService.put(`/admin/orders/${id}`, data);
-}
+    // Orders
+    getOrders: builder.query<unknown, { search?: string }>({
+      query: ({ search }) => ({
+        url: "/orders",
+        params: search ? { search } : {},
+      }),
+      providesTags: ["Order"],
+    }),
 
-export async function deleteAdminOrder(id: string) {
-  return apiService.delete(`/admin/orders/${id}`);
-}
+    updateOrder: builder.mutation<unknown, { id: string; data: unknown }>({
+      query: ({ id, data }) => ({
+        url: `/orders/${id}`,
+        method: "PUT",
+        body: data,
+      }),
+      invalidatesTags: ["Order"],
+    }),
 
-// Inventory API
-export async function getStockLevels() {
-  console.log("Calling getStockLevels");
-  return apiService.get("/admin/inventory/stock-levels");
-}
+    deleteOrder: builder.mutation<unknown, string>({
+      query: (id) => ({
+        url: `/orders/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["Order"],
+    }),
 
-export async function getLowStock() {
-  console.log("Calling getLowStock");
-  return apiService.get("/admin/inventory/low-stock");
-}
+    // Inventory
+    getStockLevels: builder.query<unknown, void>({
+      query: () => "/inventory/stock-levels",
+      providesTags: ["Inventory"],
+    }),
 
-export async function updateStock(id: string, data: unknown) {
-  console.log("Calling updateStock with id:", id, "data:", data);
-  return apiService.put(`/admin/inventory/${id}`, data);
-}
+    getLowStock: builder.query<unknown, void>({
+      query: () => "/inventory/low-stock",
+      providesTags: ["Inventory"],
+    }),
 
-export default ApiService;
+    updateStock: builder.mutation<unknown, { id: string; data: unknown }>({
+      query: ({ id, data }) => ({
+        url: `/inventory/${id}`,
+        method: "PUT",
+        body: data,
+      }),
+      invalidatesTags: ["Inventory"],
+    }),
+  }),
+});
+
+export const {
+  useGetProductsQuery,
+  useCreateProductMutation,
+  useUpdateProductMutation,
+  useDeleteProductMutation,
+  useGetCategoriesQuery,
+  useCreateCategoryMutation,
+  useUpdateCategoryMutation,
+  useDeleteCategoryMutation,
+  useGetCustomersQuery,
+  useUpdateCustomerMutation,
+  useDeleteCustomerMutation,
+  useGetOrdersQuery,
+  useUpdateOrderMutation,
+  useDeleteOrderMutation,
+  useGetStockLevelsQuery,
+  useGetLowStockQuery,
+  useUpdateStockMutation,
+} = adminApi;

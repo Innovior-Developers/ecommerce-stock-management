@@ -50,7 +50,7 @@ interface Category {
 
 interface CategoryFormProps {
   category?: Category;
-  categories: Category[];
+  categories?: Category[]; // ✅ Make it optional with default
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (data: CategoryFormValues) => void;
@@ -61,7 +61,7 @@ interface CategoryFormProps {
 
 export const CategoryForm: React.FC<CategoryFormProps> = ({
   category,
-  categories,
+  categories = [], // ✅ Provide default empty array
   isOpen,
   onOpenChange,
   onSubmit,
@@ -134,7 +134,7 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({
                 <SelectContent>
                   <SelectItem value="">No Parent (Root Category)</SelectItem>
                   {categories
-                    .filter((cat) => cat._id !== category?._id)
+                    .filter((cat) => cat._id !== category?._id) // ✅ Safe filter with fallback
                     .map((cat) => (
                       <SelectItem key={cat._id} value={cat._id}>
                         {cat.name}

@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
-use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 
@@ -21,7 +20,7 @@ class CustomerController extends Controller
                 $search = $request->search;
                 $query->where(function ($q) use ($search) {
                     $q->where('first_name', 'regex', "/$search/i")
-                      ->orWhere('last_name', 'regex', "/$search/i");
+                        ->orWhere('last_name', 'regex', "/$search/i");
                 })->orWhereHas('user', function ($q) use ($search) {
                     $q->where('email', 'regex', "/$search/i");
                 });

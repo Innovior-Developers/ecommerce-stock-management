@@ -1,15 +1,9 @@
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import {
-  BrowserRouter,
-  Routes,
-  Route,
-  createBrowserRouter,
-  RouterProvider,
-} from "react-router-dom";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { Provider } from "react-redux";
+import { store } from "@/store";
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AdminRoute from "@/components/AdminRoute";
 
@@ -28,8 +22,6 @@ import Deals from "./pages/Deals";
 import About from "./pages/About";
 import Contact from "./pages/Contact";
 import Checkout from "./pages/Checkout";
-
-const queryClient = new QueryClient();
 
 // Create router with future flags
 const router = createBrowserRouter(
@@ -51,12 +43,12 @@ const router = createBrowserRouter(
       element: <Shop />,
     },
     {
-      path: "/search",
-      element: <Search />,
-    },
-    {
       path: "/category/:categoryName",
       element: <Category />,
+    },
+    {
+      path: "/search",
+      element: <Search />,
     },
     {
       path: "/deals",
@@ -116,15 +108,13 @@ const router = createBrowserRouter(
 );
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
+  <Provider store={store}>
     <TooltipProvider>
-      <AuthProvider>
-        <Toaster />
-        <Sonner />
-        <RouterProvider router={router} />
-      </AuthProvider>
+      <Toaster />
+      <Sonner />
+      <RouterProvider router={router} />
     </TooltipProvider>
-  </QueryClientProvider>
+  </Provider>
 );
 
 export default App;

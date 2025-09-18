@@ -15,7 +15,10 @@ class OrderController extends Controller
         $cacheKey = 'orders_' . md5(serialize($request->all()));
 
         $orders = Cache::remember($cacheKey, 300, function () use ($request) {
-            $query = Order::with('customer');
+            $query = Order::with([
+                // Eager load the customer and the user associated with that customer
+                'customer.user:id,name,email'
+            ]);
 
             if ($request->has('status')) {
                 $query->where('status', $request->status);
@@ -33,7 +36,7 @@ class OrderController extends Controller
                 $query->where('created_at', '<=', $request->date_to);
             }
 
-            return $query->orderBy('created_at', 'desc')->paginate(20);
+            return $query->latest()->paginate(10);
         });
 
         return response()->json($orders);
