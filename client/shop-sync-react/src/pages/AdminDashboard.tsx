@@ -315,7 +315,9 @@ const AdminDashboard = () => {
                   <form
                     onSubmit={(e) => {
                       e.preventDefault();
-                      const formData = new FormData(e.target as HTMLFormElement);
+                      const formData = new FormData(
+                        e.target as HTMLFormElement
+                      );
                       handleCreateProduct(formData);
                     }}
                     className="space-y-4"
@@ -373,7 +375,10 @@ const AdminDashboard = () => {
                         </SelectTrigger>
                         <SelectContent>
                           {categories.map((category: unknown) => (
-                            <SelectItem key={category._id} value={category.name}>
+                            <SelectItem
+                              key={category._id}
+                              value={category.name}
+                            >
                               {category.name}
                             </SelectItem>
                           ))}
@@ -399,8 +404,13 @@ const AdminDashboard = () => {
                       >
                         Cancel
                       </Button>
-                      <Button type="submit" disabled={createProductMutation.isPending}>
-                        {createProductMutation.isPending ? "Adding..." : "Add Product"}
+                      <Button
+                        type="submit"
+                        disabled={createProductMutation.isPending}
+                      >
+                        {createProductMutation.isPending
+                          ? "Adding..."
+                          : "Add Product"}
                       </Button>
                     </div>
                   </form>
@@ -488,7 +498,7 @@ const AdminDashboard = () => {
                           </div>
                         </div>
                       ))
-                   ) }
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -739,7 +749,9 @@ const AdminDashboard = () => {
                         <form
                           onSubmit={(e) => {
                             e.preventDefault();
-                            const formData = new FormData(e.target as HTMLFormElement);
+                            const formData = new FormData(
+                              e.target as HTMLFormElement
+                            );
                             handleCreateCategory(formData);
                           }}
                           className="space-y-4"
@@ -754,7 +766,9 @@ const AdminDashboard = () => {
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="categoryDescription">Description</Label>
+                            <Label htmlFor="categoryDescription">
+                              Description
+                            </Label>
                             <Textarea
                               id="categoryDescription"
                               name="description"
@@ -763,7 +777,9 @@ const AdminDashboard = () => {
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="categorySortOrder">Sort Order</Label>
+                            <Label htmlFor="categorySortOrder">
+                              Sort Order
+                            </Label>
                             <Input
                               id="categorySortOrder"
                               name="sort_order"
@@ -780,8 +796,13 @@ const AdminDashboard = () => {
                             >
                               Cancel
                             </Button>
-                            <Button type="submit" disabled={createCategoryMutation.isPending}>
-                              {createCategoryMutation.isPending ? "Adding..." : "Add Category"}
+                            <Button
+                              type="submit"
+                              disabled={createCategoryMutation.isPending}
+                            >
+                              {createCategoryMutation.isPending
+                                ? "Adding..."
+                                : "Add Category"}
                             </Button>
                           </div>
                         </form>

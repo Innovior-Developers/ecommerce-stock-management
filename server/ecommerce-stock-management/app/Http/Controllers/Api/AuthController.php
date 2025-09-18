@@ -46,7 +46,12 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Admin login successful',
-            'user' => ['id' => $user->_id, 'name' => $user->name, 'email' => $user->email, 'role' => $user->role],
+            'user' => [
+                'id' => $user->_id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->role,
+            ],
             'token' => $token,
             'token_type' => 'Bearer',
         ]);
@@ -74,7 +79,7 @@ class AuthController extends Controller
 
         Customer::create([
             'user_id' => (string) $user->_id,
-            'first_name' => $validated['first_name'] ?? $validated['name'],
+            'first_name' => $validated['first_name'] ?? '',
             'last_name' => $validated['last_name'] ?? '',
             'phone' => $validated['phone'] ?? null,
             'marketing_consent' => false,
@@ -84,8 +89,13 @@ class AuthController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'User registered successfully',
-            'user' => ['id' => $user->_id, 'name' => $user->name, 'email' => $user->email, 'role' => $user->role],
+            'message' => 'Registration successful',
+            'user' => [
+                'id' => $user->_id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->role,
+            ],
             'token' => $token,
             'token_type' => 'Bearer',
         ], 201);
@@ -107,7 +117,10 @@ class AuthController extends Controller
         }
 
         if ($user->status !== 'active') {
-            return response()->json(['success' => false, 'message' => 'Account is not active.'], 403);
+            return response()->json([
+                'success' => false,
+                'message' => 'Account is not active.',
+            ], 403);
         }
 
         $user->tokens()->delete();
@@ -116,7 +129,12 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Login successful',
-            'user' => ['id' => $user->_id, 'name' => $user->name, 'email' => $user->email, 'role' => $user->role],
+            'user' => [
+                'id' => $user->_id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->role,
+            ],
             'token' => $token,
             'token_type' => 'Bearer',
         ]);
@@ -125,7 +143,10 @@ class AuthController extends Controller
     public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();
-        return response()->json(['success' => true, 'message' => 'Logged out successfully']);
+        return response()->json([
+            'success' => true,
+            'message' => 'Logged out successfully'
+        ]);
     }
 
     public function user(Request $request)
@@ -138,7 +159,6 @@ class AuthController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'role' => $user->role,
-                'customer' => $user->customer,
             ],
         ]);
     }

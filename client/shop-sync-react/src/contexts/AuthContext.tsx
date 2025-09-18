@@ -39,11 +39,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (token && storedUser) {
         // Verify token is still valid by fetching current user
-        const response = await authService.getCurrentUser();
-        if (response.success && response.user) {
-          setUser(response.user);
-        } else {
-          authService.clearAuthData();
+        try {
+          const response = await authService.getCurrentUser();
+          if (response.success && response.user) {
+            setUser(response.user);
+          } else {
+            // Token is invalid, clear it
+            authService.clearAuthData();
+          }
+        } catch (error) {
+          // API call failed, might be network issue, keep stored user for now
+          console.warn("Could not verify token, keeping stored user:", error);
+          setUser(storedUser);
         }
       }
     } catch (error) {
@@ -89,7 +96,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(response.user);
       toast.success("Admin login successful!");
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Admin login failed";
+      const errorMessage =
+        error instanceof Error ? error.message : "Admin login failed";
       toast.error(errorMessage);
       throw error;
     } finally {

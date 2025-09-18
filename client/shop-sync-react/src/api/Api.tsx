@@ -126,7 +126,14 @@ class ApiService {
         return {
           success: false,
           message:
-            "Network error. Please check your connection and ensure the backend server is running.",
+            "Network error. Please check your connection and ensure the backend server is running at http://localhost:8000",
+        };
+      } else if (error.code === "ECONNABORTED") {
+        // Timeout error
+        return {
+          success: false,
+          message:
+            "Request timeout. Please check if the backend server is running and responding.",
         };
       }
     }
