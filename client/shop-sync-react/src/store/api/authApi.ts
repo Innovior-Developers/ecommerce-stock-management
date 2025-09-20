@@ -25,12 +25,12 @@ export interface AuthResponse {
     name: string;
     email: string;
     role: "admin" | "customer";
+    status: string;
     avatar?: string;
   };
   token: string;
-  refresh_token?: string;
   token_type: string;
-  expires_in?: number;
+  expires_in: number;
 }
 
 export const authApi = createApi({
@@ -42,7 +42,6 @@ export const authApi = createApi({
       if (token) {
         headers.set("authorization", `Bearer ${token}`);
       }
-      // ✅ Add these two headers
       headers.set("Accept", "application/json");
       headers.set("Content-Type", "application/json");
       return headers;
@@ -65,7 +64,6 @@ export const authApi = createApi({
               setCredentials({
                 user: data.user,
                 token: data.token,
-                refreshToken: data.refresh_token,
               })
             );
           }
@@ -90,7 +88,6 @@ export const authApi = createApi({
               setCredentials({
                 user: data.user,
                 token: data.token,
-                refreshToken: data.refresh_token,
               })
             );
           }
@@ -115,7 +112,6 @@ export const authApi = createApi({
               setCredentials({
                 user: data.user,
                 token: data.token,
-                refreshToken: data.refresh_token,
               })
             );
           }
@@ -126,7 +122,10 @@ export const authApi = createApi({
     }),
 
     // Get current user
-    getCurrentUser: builder.query<{ success: boolean; user: unknown }, void>({
+    getCurrentUser: builder.query<
+      { success: boolean; user: AuthResponse["user"] },
+      void
+    >({
       query: () => "/user",
       providesTags: ["User"],
     }),
@@ -140,9 +139,9 @@ export const authApi = createApi({
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         try {
           await queryFulfilled;
-          dispatch(clearCredentials());
         } catch (error) {
-          // Clear credentials even if API call fails
+          console.warn("Logout API call failed:", error);
+        } finally {
           dispatch(clearCredentials());
         }
       },
@@ -162,11 +161,11 @@ export const authApi = createApi({
               setCredentials({
                 user: data.user,
                 token: data.token,
-                refreshToken: data.refresh_token,
               })
             );
           }
         } catch (error) {
+          console.error("Token refresh failed:", error);
           dispatch(clearCredentials());
         }
       },

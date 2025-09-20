@@ -23,7 +23,7 @@ class AuthServiceProvider extends ServiceProvider
         $this->registerPolicies();
 
         // Use our custom MongoDB PersonalAccessToken model
-        Sanctum::usePersonalAccessTokenModel(\App\Models\PersonalAccessToken::class);
+        // Sanctum::usePersonalAccessTokenModel(\App\Models\PersonalAccessToken::class);
 
         // Define custom gates for role-based access
         Gate::define('admin-access', function ($user) {

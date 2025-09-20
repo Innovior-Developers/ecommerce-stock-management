@@ -1,37 +1,28 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
+// Define the User type for consistency
 interface User {
   id: string;
   name: string;
   email: string;
   role: "admin" | "customer";
+  status: string;
   avatar?: string;
 }
 
 interface AuthState {
-  user: {
-    id: string;
-    name: string;
-    email: string;
-    role: "admin" | "customer";
-    avatar?: string;
-  } | null;
+  user: User | null;
   token: string | null;
-  refreshToken: string | null;
   isAuthenticated: boolean;
 }
 
-// Initialize state from localStorage
+// Function to load the initial state from localStorage
 const getInitialState = (): AuthState => {
-  const token = localStorage.getItem("auth_token");
-  const userStr = localStorage.getItem("user");
-  const user = userStr ? JSON.parse(userStr) : null;
-
+  const token = localStorage.getItem("jwt_token");
   return {
-    user,
-    token,
-    refreshToken: localStorage.getItem("refresh_token"),
-    isAuthenticated: !!token && !!user,
+    user: null,
+    token: token,
+    isAuthenticated: false,
   };
 };
 
@@ -39,39 +30,23 @@ const authSlice = createSlice({
   name: "auth",
   initialState: getInitialState(),
   reducers: {
+    // This action is called on successful login or token refresh
     setCredentials: (
       state,
-      action: PayloadAction<{
-        user: unknown;
-        token: string;
-        refreshToken?: string;
-      }>
+      action: PayloadAction<{ user: User; token: string }>
     ) => {
-      const { user, token, refreshToken } = action.payload;
+      const { user, token } = action.payload;
       state.user = user;
       state.token = token;
       state.isAuthenticated = true;
-      if (refreshToken) {
-        state.refreshToken = refreshToken;
-      }
-
-      // Persist to localStorage
-      localStorage.setItem("auth_token", token);
-      localStorage.setItem("user", JSON.stringify(user));
-      if (refreshToken) {
-        localStorage.setItem("refresh_token", refreshToken);
-      }
+      localStorage.setItem("jwt_token", token);
     },
+    // This action is called on logout
     clearCredentials: (state) => {
       state.user = null;
       state.token = null;
-      state.refreshToken = null;
       state.isAuthenticated = false;
-
-      // Clear from localStorage
-      localStorage.removeItem("auth_token");
-      localStorage.removeItem("refresh_token");
-      localStorage.removeItem("user");
+      localStorage.removeItem("jwt_token");
     },
   },
 });

@@ -3,18 +3,14 @@
 namespace App\Models;
 
 use MongoDB\Laravel\Auth\User as Authenticatable;
-use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Support\Str;
-// Use our custom NewAccessToken class
-use App\Models\NewAccessToken;
+use Tymon\JWTAuth\Contracts\JWTSubject;
+use Carbon\Carbon;
 
-class User extends Authenticatable
+class User extends Authenticatable implements JWTSubject
 {
-    // We keep this trait for some underlying Sanctum integrations,
-    // but we will override its main methods.
-    use HasApiTokens, Notifiable, HasFactory;
+    use Notifiable, HasFactory;
 
     protected $connection = 'mongodb';
     protected $collection = 'users';
@@ -41,68 +37,44 @@ class User extends Authenticatable
         'password' => 'hashed',
     ];
 
-    /**
-     * The access token the user is using for the current request.
-     *
-     * @var \App\Models\PersonalAccessToken
-     */
-    protected $accessToken;
+    protected $dates = [
+        'email_verified_at',
+    ];
 
     /**
-     * Get the access tokens for the user.
+     * Get the identifier that will be stored in the subject claim of the JWT.
      */
-    public function tokens()
+    public function getJWTIdentifier()
     {
-        return $this->morphMany(PersonalAccessToken::class, 'tokenable');
+        return $this->getKey();
     }
 
     /**
-     * Create a new personal access token for the user.
+     * Return a key value array, containing any custom claims to be added to the JWT.
      */
-    public function createToken(string $name, array $abilities = ['*'])
+    public function getJWTCustomClaims()
     {
-        $plainTextToken = Str::random(40);
-
-        /** @var \App\Models\PersonalAccessToken $token */
-        $token = $this->tokens()->create([
-            'name' => $name,
-            'token' => hash('sha256', $plainTextToken),
-            'abilities' => $abilities,
-        ]);
-
-        // Use the _id property for MongoDB and cast it to a string.
-        return new NewAccessToken($token, ((string) $token->_id).'|'.$plainTextToken);
-    }
-
-    /**
-     * Get the current access token being used by the user.
-     */
-    public function currentAccessToken()
-    {
-        return $this->accessToken;
-    }
-
-    /**
-     * Set the current access token for the user.
-     */
-    public function withAccessToken($accessToken)
-    {
-        $this->accessToken = $accessToken;
-
-        return $this;
-    }
-
-    /**
-     * Determine if the current API token has a given scope.
-     */
-    public function tokenCan(string $ability): bool
-    {
-        return $this->accessToken && $this->accessToken->can($ability);
+        return [
+            'role' => $this->role,
+            'status' => $this->status,
+            'email' => $this->email,
+            'name' => $this->name,
+        ];
     }
 
     // Relationships
     public function customer()
     {
         return $this->hasOne(Customer::class, 'user_id', '_id');
+    }
+
+    /**
+     * Set the email verified at timestamp
+     */
+    public function setEmailVerifiedAtAttribute($value)
+    {
+        $this->attributes['email_verified_at'] = $value instanceof Carbon
+            ? $value
+            : Carbon::parse($value);
     }
 }

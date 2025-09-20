@@ -22,6 +22,7 @@ import Deals from "./pages/Deals";
 import About from "./pages/About";
 import Contact from "./pages/Contact";
 import Checkout from "./pages/Checkout";
+import AuthCallback from "./pages/AuthCallback";
 
 // Create router with future flags
 const router = createBrowserRouter(
@@ -93,6 +94,10 @@ const router = createBrowserRouter(
           <AdminDashboard />
         </AdminRoute>
       ),
+    },
+    {
+      path: "/auth/callback",
+      element: <AuthCallback />,
     },
     {
       path: "*",

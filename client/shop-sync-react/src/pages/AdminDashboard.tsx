@@ -59,6 +59,7 @@ import {
   CategoryCard,
 } from "@/components/admin forms/Category.form";
 import { InventoryUpdateForm } from "@/components/admin forms/Inventory.form";
+import { CategoriesDebug } from "@/components/CategoriesDebug";
 
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
@@ -90,6 +91,7 @@ const AdminDashboard = () => {
   const {
     data: categoriesResponse,
     isLoading: categoriesLoading,
+    error: categoriesError,
   } = useGetCategoriesQuery({ search: categorySearch }, { skip: !isAuthenticated });
 
   const {
@@ -120,13 +122,20 @@ const AdminDashboard = () => {
 
   // Extract data with proper fallbacks
   const products = productsResponse?.data?.data || productsResponse?.data || [];
-  const categories =
-    categoriesResponse?.data?.data || categoriesResponse?.data || [];
+  const categories = categoriesResponse?.data?.data || categoriesResponse?.data || [];
   const customers =
     customersResponse?.data?.data || customersResponse?.data || [];
   const orders = ordersResponse?.data?.data || ordersResponse?.data || [];
   const lowStockProducts = lowStockResponse?.data || [];
   const stockLevels = stockLevelsResponse?.data || [];
+
+  // Debug categories in console
+  console.log("🏷️ Categories for Product Form:", {
+    categoriesResponse,
+    categories,
+    categoriesLoading,
+    categoriesError
+  });
 
   // Handle mutations
   const handleCreateProduct = async (data: unknown) => {
@@ -848,12 +857,13 @@ const AdminDashboard = () => {
         </Tabs>
       </main>
 
+<CategoriesDebug /> 
       {/* Forms */}
       <ProductForm
         isOpen={isAddProductOpen}
         onOpenChange={setIsAddProductOpen}
         onSubmit={handleCreateProduct}
-        categories={categories}
+        categories={categories} // ✅ Make sure this is being passed
         mode="create"
       />
 
@@ -865,7 +875,7 @@ const AdminDashboard = () => {
         }}
         onUpdate={(id, data) => handleUpdateProduct(id, data)}
         product={selectedProduct}
-        categories={categories}
+        categories={categories} // ✅ Make sure this is being passed
         mode="edit"
       />
 

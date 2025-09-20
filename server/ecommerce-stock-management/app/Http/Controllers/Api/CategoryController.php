@@ -12,25 +12,21 @@ class CategoryController extends Controller
 {
     public function index(Request $request)
     {
-        $cacheKey = 'categories_' . md5(serialize($request->all()));
+        $search = $request->get('search');
 
-        $categories = Cache::remember($cacheKey, 600, function () use ($request) {
-            $query = Category::query();
+        $query = Category::query();
 
-            if ($request->has('status')) {
-                $query->where('status', $request->status);
-            }
+        if ($search) {
+            $query->where('name', 'like', "%{$search}%")
+                ->orWhere('description', 'like', "%{$search}%");
+        }
 
-            if ($request->has('parent_id')) {
-                $query->where('parent_id', $request->parent_id);
-            }
-
-            return $query->orderBy('sort_order', 'asc')->get();
-        });
+        $categories = $query->latest()->get();
 
         return response()->json([
             'success' => true,
             'data' => $categories,
+            'message' => 'Categories retrieved successfully'
         ]);
     }
 

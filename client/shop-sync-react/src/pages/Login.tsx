@@ -45,7 +45,6 @@ const Login = () => {
 
   const handleCustomerSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     try {
       const response = await customerLogin(customerForm).unwrap();
       if (response.success) {
@@ -54,13 +53,12 @@ const Login = () => {
       }
     } catch (error: unknown) {
       console.error("Customer login error:", error);
-      toast.error(error.data?.message || "Login failed");
+      toast.error(error?.data?.message || "Login failed");
     }
   };
 
   const handleAdminSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     try {
       const response = await adminLogin(adminForm).unwrap();
       if (response.success) {
@@ -69,13 +67,8 @@ const Login = () => {
       }
     } catch (error: unknown) {
       console.error("Admin login error:", error);
-      toast.error(error.data?.message || "Admin login failed");
+      toast.error(error?.data?.message || "Admin login failed");
     }
-  };
-
-  const handleSocialLogin = (provider: "google" | "github") => {
-    const socialUrl = `http://localhost:8000/api/auth/social/${provider}`;
-    window.location.href = socialUrl;
   };
 
   const isLoading = adminLoading || customerLoading;
@@ -132,36 +125,6 @@ const Login = () => {
                   {isLoading ? "Signing in..." : "Sign In"}
                 </Button>
               </form>
-
-              <div className="mt-4 space-y-2">
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-background px-2 text-muted-foreground">
-                      Or continue with
-                    </span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => handleSocialLogin("google")}
-                    disabled={isLoading}
-                  >
-                    Google
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => handleSocialLogin("github")}
-                    disabled={isLoading}
-                  >
-                    GitHub
-                  </Button>
-                </div>
-              </div>
             </TabsContent>
 
             <TabsContent value="admin">
@@ -206,17 +169,11 @@ const Login = () => {
           </Tabs>
 
           <div className="mt-4 text-center text-sm">
-            <Link
-              to="/forgot-password"
-              className="text-primary hover:underline"
-            >
-              Forgot your password?
-            </Link>
-          </div>
-          <div className="mt-2 text-center text-sm">
-            Don't have an account?{" "}
+            <span className="text-muted-foreground">
+              Don't have an account?{" "}
+            </span>
             <Link to="/register" className="text-primary hover:underline">
-              Sign up
+              Register here
             </Link>
           </div>
         </CardContent>

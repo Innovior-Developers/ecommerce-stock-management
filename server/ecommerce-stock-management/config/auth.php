@@ -41,7 +41,8 @@ return [
         ],
 
         'api' => [
-            'driver' => 'sanctum', // Change this from 'session' or remove it to use sanctum
+            // JWT guard for API auth
+            'driver' => 'jwt',
             'provider' => 'users',
         ],
     ],
@@ -66,7 +67,7 @@ return [
     'providers' => [
         'users' => [
             'driver' => 'eloquent',
-            'model' => env('AUTH_MODEL', App\Models\User::class),
+            'model' => App\Models\User::class,
         ],
     ],
 

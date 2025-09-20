@@ -74,7 +74,7 @@ interface ProductFormProps {
 
 export const ProductForm: React.FC<ProductFormProps> = ({
   product,
-  categories,
+  categories = [], // ✅ Provide default empty array
   isOpen,
   onOpenChange,
   onSubmit,
@@ -226,21 +226,45 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                   onValueChange={(value) => form.setValue("category", value)}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
+                    <SelectValue
+                      placeholder={
+                        categories.length === 0
+                          ? "Loading categories..."
+                          : "Select category"
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent>
-                    {categories
-                      .filter((cat) => cat.status === "active")
-                      .map((category) => (
-                        <SelectItem key={category._id} value={category.name}>
-                          {category.name}
-                        </SelectItem>
-                      ))}
+                    {categories.length === 0 ? (
+                      // non-empty value required by Radix; disabled so it can't be selected
+                      <SelectItem
+                        value="__no_categories"
+                        disabled
+                        className="text-sm text-muted-foreground"
+                      >
+                        No categories available. Please create a category first.
+                      </SelectItem>
+                    ) : (
+                      // use the category _id as the value so the backend receives the id
+                      categories
+                        .filter((cat) => cat.status === "active")
+                        .map((category) => (
+                          <SelectItem key={category._id} value={category.name}>
+                            {category.name}
+                          </SelectItem>
+                        ))
+                    )}
                   </SelectContent>
                 </Select>
                 {form.formState.errors.category && (
                   <p className="text-sm text-destructive">
                     {form.formState.errors.category.message}
+                  </p>
+                )}
+                {categories.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    📝 Tip: Create categories first in the Categories tab before
+                    adding products.
                   </p>
                 )}
               </div>
@@ -308,9 +332,14 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading}>
+            <Button
+              type="submit"
+              disabled={isLoading || categories.length === 0}
+            >
               {isLoading
                 ? "Saving..."
+                : categories.length === 0
+                ? "Create Categories First"
                 : mode === "edit"
                 ? "Update Product"
                 : "Create Product"}
