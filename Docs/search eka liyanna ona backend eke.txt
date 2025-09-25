@@ -1,3 +1,14 @@
 search eka liyanna ona backend eke 
 payment paypal, stripe danna ona
 Stats overview 
+product, category, inventory, create forms tika hadaganna ona
+
+
+security measurements = 
+- don't send id to frontend to validate authentication only send jwt-token
+- remove backend testing routes arfter the development jwt-token-testing file.
+- 
+
+
+
+simple things to change - cart icon count clear i users not signed

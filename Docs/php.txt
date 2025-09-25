@@ -40,3 +40,79 @@ class Product extends Model
         return $query->where('status', 'active');
     }
 }
+--------------------*---------------------
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "AllowS3ObjectActions",
+            "Effect": "Allow",
+            "Action": [
+                "s3:PutObject",
+                "s3:GetObject",
+                "s3:DeleteObject",
+                "s3:ListBucket"
+            ],
+            "Resource": [
+                "arn:aws:s3:::ecommerce-product-images-2002/*",
+                "arn:aws:s3:::ecommerce-product-images-2002"
+            ]
+        }
+    ]
+}
+
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetObject",
+                "s3:PutObject",
+                "s3:DeleteObject",
+                "s3:GetObjectAcl",
+                "s3:PutObjectAcl"
+            ],
+            "Resource": "arn:aws:s3:::ecommerce-product-images-2002/*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:ListBucket"
+            ],
+            "Resource": "arn:aws:s3:::ecommerce-product-images-2002"
+        }
+    ]
+}
+
+----------*-------------------
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "PublicReadGetObject",
+            "Effect": "Allow",
+            "Principal": "*",
+            "Action": "s3:GetObject",
+            "Resource": "arn:aws:s3:::ecommerce-product-images-2002/*"
+        },
+        {
+            "Sid": "AllowSpecificUserActions",
+            "Effect": "Allow",
+            "Principal": {
+                "AWS": "arn:aws:iam::818719120199:user/laravel-esm-s3-user"
+            },
+            "Action": [
+                "s3:PutObject",
+                "s3:DeleteObject",
+                "s3:GetObjectAcl",
+                "s3:PutObjectAcl",
+                "s3:ListBucket"
+            ],
+            "Resource": [
+                "arn:aws:s3:::ecommerce-product-images-2002",
+                "arn:aws:s3:::ecommerce-product-images-2002/*"
+            ]
+        }
+    ]
+}

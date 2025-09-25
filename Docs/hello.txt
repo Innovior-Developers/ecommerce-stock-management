@@ -25,6 +25,8 @@ docker-compose logs react
 # Enter Laravel container
 docker-compose exec laravel bash
 
+php artisan db:seed --class=AdminUserSeeder
+
 # Install missing packages
 composer require mongodb/laravel-mongodb laravel/sanctum
 

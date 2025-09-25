@@ -441,7 +441,7 @@ const AdminDashboard = () => {
                           </Badge>
                         </div>
                       ))
-                    )}
+                  )}
                   </div>
                 </CardContent>
               </Card>

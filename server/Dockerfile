@@ -1,6 +1,9 @@
 FROM php:8.3-fpm
 
-# Install system dependencies including SSL certificates
+# Set environment variables to prevent interactive prompts
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install system dependencies including SSL, networking tools, and redis-cli
 RUN apt-get update && apt-get install -y \
     git \
     curl \
@@ -14,22 +17,18 @@ RUN apt-get update && apt-get install -y \
     nginx \
     libzip-dev \
     ca-certificates \
-    openssl
+    openssl \
+    libcurl4-openssl-dev \
+    redis-tools \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-# Update SSL certificates
-RUN update-ca-certificates
+# Install PHP extensions
+RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip curl
 
-# Clear cache
-RUN apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Install PHP extensions (including zip)
-RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip
-
-# Install MongoDB PHP extension with SSL support
-RUN pecl install mongodb && docker-php-ext-enable mongodb
-
-# Install Redis PHP extension
-RUN pecl install redis && docker-php-ext-enable redis
+# Install MongoDB and Redis PHP extensions
+RUN pecl install mongodb redis \
+    && docker-php-ext-enable mongodb redis
 
 # Get latest Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -37,34 +36,24 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Set working directory
 WORKDIR /var/www/html
 
-# Copy existing application directory contents
-COPY ./ecommerce-stock-management/ /var/www/html
+# Copy application files
+COPY ./ecommerce-stock-management /var/www/html
 
-# Install dependencies
+# Install Composer dependencies
+# This ensures aws-sdk-php is installed inside the container
 RUN composer install --no-interaction --optimize-autoloader --no-dev
 
-# Only run safe commands that don't require external services
-RUN composer dump-autoload --optimize && \
-    php artisan view:clear && \
-    php artisan route:clear && \
-    php artisan config:clear
+# Set correct permissions for storage and bootstrap cache
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
+    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Skip config:cache and route:cache during build
-# These will be run when the container starts and has access to Redis
-
-# Set permissions
-RUN chown -R www-data:www-data /var/www/html \
-    && chmod -R 755 /var/www/html/storage \
-    && chmod -R 755 /var/www/html/bootstrap/cache
-
-# Copy nginx config
+# Copy Nginx config and startup script
 COPY ./nginx.conf /etc/nginx/nginx.conf
+COPY ./start.sh /start.sh
+RUN chmod +x /start.sh
 
 # Expose port 8000
 EXPOSE 8000
 
-# Start script
-COPY ./start.sh /start.sh
-RUN chmod +x /start.sh
-
+# Run the startup script
 CMD ["/start.sh"]

@@ -10,9 +10,8 @@ export const adminApi = createApi({
       if (token) {
         headers.set("authorization", `Bearer ${token}`);
       }
-      // ✅ Add these two headers
       headers.set("Accept", "application/json");
-      headers.set("Content-Type", "application/json");
+      // ✅ Don't set Content-Type - let RTK Query handle it based on body type
       return headers;
     },
   }),
@@ -27,13 +26,21 @@ export const adminApi = createApi({
       providesTags: ["Product"],
     }),
 
-    createProduct: builder.mutation<unknown, unknown>({
-      query: (productData) => ({
+    createProduct: builder.mutation<unknown, FormData>({
+      query: (formData) => ({
         url: "/products",
         method: "POST",
-        body: productData,
+        body: formData,
       }),
       invalidatesTags: ["Product", "Inventory"],
+      // ✅ Add this to force refresh
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          // Force refresh the products list
+          dispatch(adminApi.util.invalidateTags(["Product"]));
+        } catch { /* empty */ }
+      },
     }),
 
     updateProduct: builder.mutation<unknown, { id: string; data: unknown }>({

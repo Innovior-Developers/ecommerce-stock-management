@@ -27,8 +27,8 @@ class ProductController extends Controller
                 $search = $request->search;
                 $query->where(function ($q) use ($search) {
                     $q->where('name', 'regex', "/$search/i")
-                      ->orWhere('description', 'regex', "/$search/i")
-                      ->orWhere('sku', 'regex', "/$search/i");
+                        ->orWhere('description', 'regex', "/$search/i")
+                        ->orWhere('sku', 'regex', "/$search/i");
                 });
             }
 
@@ -72,11 +72,12 @@ class ProductController extends Controller
             'name' => 'required|string|max:255',
             'description' => 'required|string',
             'price' => 'required|numeric|min:0',
-            'sku' => 'required|string|unique:products,sku',
+            'sku' => 'nullable|string|unique:products,sku', // Made optional since auto-generated
             'category' => 'required|string',
-            'stock_quantity' => 'integer|min:0',
-            'status' => 'in:active,inactive',
-            'image_url' => 'nullable|url',
+            'stock_quantity' => 'nullable|integer|min:0',
+            'status' => 'nullable|in:active,inactive',
+            'images' => 'nullable|array|max:5', // Allow multiple images
+            'images.*' => 'image|mimes:jpeg,png,jpg,gif,webp|max:5120', // 5MB max per image
             'weight' => 'nullable|numeric|min:0',
             'dimensions' => 'nullable|array',
             'meta_title' => 'nullable|string|max:255',
@@ -87,15 +88,27 @@ class ProductController extends Controller
         $validated['status'] = $validated['status'] ?? 'active';
         $validated['stock_quantity'] = $validated['stock_quantity'] ?? 0;
 
+        // Remove images from validated data for now
+        $images = $request->file('images', []);
+        unset($validated['images']);
+
+        // Create product first
         $product = Product::create($validated);
 
-        // Clear cache
-        Cache::tags(['products'])->flush();
+        // Upload images if provided
+        if ($request->hasFile('images')) {
+            $images = $request->file('images');
+            $uploadedImages = $product->uploadMultipleImages($images);
 
+            // ✅ Make sure this line exists and works
+            $product->update(['images' => $uploadedImages]);
+        }
+
+        // ✅ Return fresh product with images
         return response()->json([
             'success' => true,
             'message' => 'Product created successfully',
-            'data' => $product,
+            'data' => $product->fresh(), // This should include images
         ], 201);
     }
 
@@ -116,19 +129,47 @@ class ProductController extends Controller
         $product = Product::findOrFail($id);
 
         $validated = $request->validate([
-            'name' => 'string|max:255',
-            'description' => 'string',
-            'price' => 'numeric|min:0',
-            'sku' => ['string', Rule::unique('products')->ignore($id, '_id')],
-            'category' => 'string',
-            'stock_quantity' => 'integer|min:0',
-            'status' => 'in:active,inactive',
-            'image_url' => 'nullable|url',
+            'name' => 'nullable|string|max:255',
+            'description' => 'nullable|string',
+            'price' => 'nullable|numeric|min:0',
+            'sku' => ['nullable', 'string', Rule::unique('products')->ignore($id, '_id')],
+            'category' => 'nullable|string',
+            'stock_quantity' => 'nullable|integer|min:0',
+            'status' => 'nullable|in:active,inactive',
+            'new_images' => 'nullable|array|max:5',
+            'new_images.*' => 'image|mimes:jpeg,png,jpg,gif,webp|max:5120',
+            'remove_images' => 'nullable|array', // Array of image indices to remove
+            'remove_images.*' => 'integer',
             'weight' => 'nullable|numeric|min:0',
             'dimensions' => 'nullable|array',
             'meta_title' => 'nullable|string|max:255',
             'meta_description' => 'nullable|string',
         ]);
+
+        // Handle image removals
+        if ($request->has('remove_images')) {
+            $removeImages = $request->input('remove_images');
+            // Sort in descending order to avoid index issues
+            rsort($removeImages);
+
+            foreach ($removeImages as $imageIndex) {
+                $product->deleteImage($imageIndex);
+            }
+
+            // Refresh product data
+            $product = $product->fresh();
+        }
+
+        // Handle new images
+        $newImages = $request->file('new_images', []);
+        if (!empty($newImages)) {
+            $existingImages = $product->images ?? [];
+            $updatedImages = $product->uploadMultipleImages($newImages, $existingImages);
+            $validated['images'] = $updatedImages;
+        }
+
+        // Remove image-related fields from validated data
+        unset($validated['new_images'], $validated['remove_images']);
 
         $product->update($validated);
 
@@ -139,7 +180,7 @@ class ProductController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Product updated successfully',
-            'data' => $product,
+            'data' => $product->fresh(),
         ]);
     }
 
@@ -156,7 +197,7 @@ class ProductController extends Controller
             ], 400);
         }
 
-        $product->delete();
+        $product->delete(); // This will trigger deleteImages() in the model
 
         // Clear cache
         Cache::forget("product_{$id}");
@@ -165,6 +206,46 @@ class ProductController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Product deleted successfully',
+        ]);
+    }
+
+    // Additional endpoint to upload images separately
+    public function uploadImages(Request $request, $id)
+    {
+        $product = Product::findOrFail($id);
+
+        $request->validate([
+            'images' => 'required|array|max:5',
+            'images.*' => 'image|mimes:jpeg,png,jpg,gif,webp|max:5120',
+        ]);
+
+        $existingImages = $product->images ?? [];
+        $newImages = $product->uploadMultipleImages($request->file('images'), $existingImages);
+
+        $product->update(['images' => $newImages]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Images uploaded successfully',
+            'data' => $product->fresh(),
+        ]);
+    }
+
+    // Delete specific image
+    public function deleteImage(Request $request, $id)
+    {
+        $product = Product::findOrFail($id);
+
+        $request->validate([
+            'image_index' => 'required|integer|min:0',
+        ]);
+
+        $product->deleteImage($request->input('image_index'));
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Image deleted successfully',
+            'data' => $product->fresh(),
         ]);
     }
 }

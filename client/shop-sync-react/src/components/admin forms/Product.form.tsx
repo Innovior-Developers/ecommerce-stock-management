@@ -22,12 +22,15 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Package, Edit, Trash2, Eye, DollarSign } from "lucide-react";
+import {
+  useCreateProductMutation,
+  useUpdateProductMutation,
+} from "../../store/api/adminApi";
 
 const productSchema = z.object({
   name: z.string().min(1, "Name is required").max(255, "Name too long"),
   description: z.string().min(1, "Description is required"),
   price: z.number().min(0, "Price must be non-negative"),
-  sku: z.string().min(1, "SKU is required"),
   category: z.string().min(1, "Category is required"),
   stock_quantity: z.number().min(0, "Stock must be non-negative").default(0),
   status: z.enum(["active", "inactive"]).default("active"),
@@ -35,6 +38,7 @@ const productSchema = z.object({
   weight: z.number().min(0).optional(),
   meta_title: z.string().max(255).optional(),
   meta_description: z.string().optional(),
+  images: z.any().optional(),
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -44,7 +48,6 @@ interface Product {
   name: string;
   description: string;
   price: number;
-  sku: string;
   category: string;
   stock_quantity: number;
   status: string;
@@ -88,7 +91,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       name: product?.name || "",
       description: product?.description || "",
       price: product?.price || 0,
-      sku: product?.sku || "",
       category: product?.category || "",
       stock_quantity: product?.stock_quantity || 0,
       status: (product?.status as "active" | "inactive") || "active",
@@ -99,11 +101,47 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     },
   });
 
+  const [createProduct, { isLoading: isCreating }] = useCreateProductMutation();
+  const [updateProduct, { isLoading: isUpdating }] = useUpdateProductMutation();
+
   const handleSubmit = (data: ProductFormValues) => {
+    console.log("🔍 Form data before processing:", data);
+
+    const formData = new FormData();
+
+    Object.entries(data).forEach(([key, value]) => {
+      if (key === "images" && value instanceof FileList) {
+        console.log(`📁 Adding ${value.length} images`);
+        Array.from(value).forEach((file, index) => {
+          formData.append(`images[${index}]`, file);
+        });
+      } else if (value !== undefined && value !== null && value !== "") {
+        console.log(`📝 Adding ${key}:`, value);
+        formData.append(key, String(value));
+      }
+    });
+
+    // Add default values if missing
+    if (!formData.has("status")) {
+      formData.append("status", "active");
+    }
+    if (!formData.has("stock_quantity")) {
+      formData.append("stock_quantity", "0");
+    }
+
+    // Debug FormData contents
+    console.log("📦 FormData contents:");
+    for (const [key, value] of formData.entries()) {
+      console.log(
+        `  ${key}:`,
+        value instanceof File ? `File: ${value.name}` : value
+      );
+    }
+
     if (mode === "edit" && product && onUpdate) {
-      onUpdate(product._id, data);
+      onUpdate(product._id, formData);
     } else {
-      onSubmit(data);
+      onSubmit(formData);
     }
     onOpenChange(false);
     form.reset();
@@ -138,19 +176,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 {form.formState.errors.name && (
                   <p className="text-sm text-destructive">
                     {form.formState.errors.name.message}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="sku">SKU *</Label>
-                <Input
-                  id="sku"
-                  placeholder="Product SKU"
-                  {...form.register("sku")}
-                />
-                {form.formState.errors.sku && (
-                  <p className="text-sm text-destructive">
-                    {form.formState.errors.sku.message}
                   </p>
                 )}
               </div>
@@ -292,13 +317,17 @@ export const ProductForm: React.FC<ProductFormProps> = ({
           <div className="space-y-4">
             <h4 className="font-semibold">Media</h4>
             <div className="space-y-2">
-              <Label htmlFor="image_url">Image URL</Label>
-              <Input
-                id="image_url"
-                type="url"
-                placeholder="https://example.com/product-image.jpg"
-                {...form.register("image_url")}
+              <Label htmlFor="images">Product Images</Label>
+              <input
+                id="images"
+                type="file"
+                multiple
+                accept="image/*"
+                {...form.register("images")}
               />
+              <p className="text-xs text-muted-foreground">
+                You can upload up to 5 images (jpeg, png, jpg, gif, webp).
+              </p>
             </div>
           </div>
 

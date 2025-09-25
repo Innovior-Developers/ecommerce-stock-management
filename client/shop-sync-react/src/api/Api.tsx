@@ -199,7 +199,13 @@ class ApiService {
     config?: AxiosRequestConfig
   ): Promise<ApiResponse<T>> {
     try {
-      const response = await this.api.post(endpoint, data, config);
+      const response = await this.api.post(endpoint, data, {
+        ...config,
+        headers:
+          data instanceof FormData
+            ? undefined
+            : { "Content-Type": "application/json" },
+      });
       return response.data;
     } catch (error) {
       console.error(`POST ${endpoint} failed:`, error);

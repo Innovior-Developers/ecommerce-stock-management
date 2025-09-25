@@ -2,10 +2,23 @@ import { useState, useMemo } from "react";
 import { Filter, SortAsc, Grid, List } from "lucide-react";
 import ProductCard from "./ProductCard";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 // Import product images
 import productHeadphones from "@/assets/product-headphones.jpg";
@@ -13,13 +26,13 @@ import productWatch from "@/assets/product-watch.jpg";
 import productBag from "@/assets/product-bag.jpg";
 
 // Mock product data
-const products = [
+const backendProducts = [
   {
     id: "1",
     name: "Premium Wireless Headphones",
     price: 299.99,
     originalPrice: 399.99,
-    image: productHeadphones,
+    images: [{ url: productHeadphones }],
     category: "Electronics",
     stock: 15,
     rating: 4.8,
@@ -30,7 +43,7 @@ const products = [
     id: "2",
     name: "Luxury Smart Watch",
     price: 899.99,
-    image: productWatch,
+    images: [{ url: productWatch }],
     category: "Electronics",
     stock: 8,
     rating: 4.9,
@@ -42,7 +55,7 @@ const products = [
     name: "Executive Leather Briefcase",
     price: 349.99,
     originalPrice: 449.99,
-    image: productBag,
+    images: [{ url: productBag }],
     category: "Accessories",
     stock: 3,
     rating: 4.7,
@@ -53,7 +66,7 @@ const products = [
     id: "4",
     name: "Ultra-Light Laptop Stand",
     price: 79.99,
-    image: productHeadphones, // Reusing for demo
+    images: [{ url: productHeadphones }], // Reusing for demo
     category: "Office",
     stock: 25,
     rating: 4.5,
@@ -64,7 +77,7 @@ const products = [
     id: "5",
     name: "Professional Camera Lens",
     price: 1299.99,
-    image: productWatch, // Reusing for demo
+    images: [{ url: productWatch }], // Reusing for demo
     category: "Photography",
     stock: 0,
     rating: 4.9,
@@ -76,7 +89,7 @@ const products = [
     name: "Ergonomic Office Chair",
     price: 599.99,
     originalPrice: 799.99,
-    image: productBag, // Reusing for demo
+    images: [{ url: productBag }], // Reusing for demo
     category: "Furniture",
     stock: 12,
     rating: 4.6,
@@ -84,6 +97,12 @@ const products = [
     isSale: true,
   },
 ];
+
+const products = backendProducts.map((p) => ({
+  ...p,
+  images: p.images || [],
+  image: p.images?.[0]?.url || p.image_url || "/assets/default-product.jpg",
+}));
 
 interface ProductGridProps {
   itemsPerPage?: number;
@@ -96,15 +115,15 @@ const ProductGrid = ({ itemsPerPage = 8 }: ProductGridProps) => {
   const [currentPage, setCurrentPage] = useState(1);
 
   const categories = useMemo(() => {
-    const cats = [...new Set(products.map(p => p.category))];
+    const cats = [...new Set(products.map((p) => p.category))];
     return ["all", ...cats];
   }, []);
 
   const filteredAndSortedProducts = useMemo(() => {
     let filtered = products;
-    
+
     if (selectedCategory !== "all") {
-      filtered = filtered.filter(p => p.category === selectedCategory);
+      filtered = filtered.filter((p) => p.category === selectedCategory);
     }
 
     filtered.sort((a, b) => {
@@ -161,7 +180,7 @@ const ProductGrid = ({ itemsPerPage = 8 }: ProductGridProps) => {
               Discover our curated selection of premium products
             </p>
           </div>
-          
+
           <div className="flex items-center gap-2">
             <Button
               variant={viewMode === "grid" ? "default" : "ghost"}
@@ -192,8 +211,13 @@ const ProductGrid = ({ itemsPerPage = 8 }: ProductGridProps) => {
             <div className="flex flex-col md:flex-row gap-4">
               {/* Category Filter */}
               <div className="flex-1">
-                <label className="text-sm font-medium mb-2 block">Category</label>
-                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <label className="text-sm font-medium mb-2 block">
+                  Category
+                </label>
+                <Select
+                  value={selectedCategory}
+                  onValueChange={setSelectedCategory}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
@@ -209,15 +233,21 @@ const ProductGrid = ({ itemsPerPage = 8 }: ProductGridProps) => {
 
               {/* Sort */}
               <div className="flex-1">
-                <label className="text-sm font-medium mb-2 block">Sort By</label>
+                <label className="text-sm font-medium mb-2 block">
+                  Sort By
+                </label>
                 <Select value={sortBy} onValueChange={setSortBy}>
                   <SelectTrigger>
                     <SelectValue placeholder="Sort by" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="name">Name A-Z</SelectItem>
-                    <SelectItem value="price-low">Price: Low to High</SelectItem>
-                    <SelectItem value="price-high">Price: High to Low</SelectItem>
+                    <SelectItem value="price-low">
+                      Price: Low to High
+                    </SelectItem>
+                    <SelectItem value="price-high">
+                      Price: High to Low
+                    </SelectItem>
                     <SelectItem value="rating">Highest Rated</SelectItem>
                   </SelectContent>
                 </Select>
@@ -244,16 +274,20 @@ const ProductGrid = ({ itemsPerPage = 8 }: ProductGridProps) => {
         {/* Results Info */}
         <div className="flex justify-between items-center mb-6">
           <p className="text-sm text-muted-foreground">
-            Showing {startIndex + 1}-{Math.min(endIndex, filteredAndSortedProducts.length)} of {filteredAndSortedProducts.length} products
+            Showing {startIndex + 1}-
+            {Math.min(endIndex, filteredAndSortedProducts.length)} of{" "}
+            {filteredAndSortedProducts.length} products
           </p>
         </div>
 
         {/* Products Grid */}
-        <div className={`grid gap-6 ${
-          viewMode === "grid" 
-            ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" 
-            : "grid-cols-1"
-        }`}>
+        <div
+          className={`grid gap-6 ${
+            viewMode === "grid"
+              ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+              : "grid-cols-1"
+          }`}
+        >
           {currentProducts.map((product) => (
             <ProductCard
               key={product.id}
@@ -270,10 +304,12 @@ const ProductGrid = ({ itemsPerPage = 8 }: ProductGridProps) => {
             <p className="text-muted-foreground text-lg mb-4">
               No products found matching your criteria
             </p>
-            <Button onClick={() => {
-              setSelectedCategory("all");
-              setSortBy("name");
-            }}>
+            <Button
+              onClick={() => {
+                setSelectedCategory("all");
+                setSortBy("name");
+              }}
+            >
               Clear Filters
             </Button>
           </div>
@@ -285,39 +321,48 @@ const ProductGrid = ({ itemsPerPage = 8 }: ProductGridProps) => {
             <Pagination>
               <PaginationContent>
                 <PaginationItem>
-                  <PaginationPrevious 
+                  <PaginationPrevious
                     href="#"
                     onClick={(e) => {
                       e.preventDefault();
                       if (currentPage > 1) setCurrentPage(currentPage - 1);
                     }}
-                    className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
+                    className={
+                      currentPage === 1 ? "pointer-events-none opacity-50" : ""
+                    }
                   />
                 </PaginationItem>
-                
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                  <PaginationItem key={page}>
-                    <PaginationLink
-                      href="#"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setCurrentPage(page);
-                      }}
-                      isActive={currentPage === page}
-                    >
-                      {page}
-                    </PaginationLink>
-                  </PaginationItem>
-                ))}
-                
+
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                  (page) => (
+                    <PaginationItem key={page}>
+                      <PaginationLink
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setCurrentPage(page);
+                        }}
+                        isActive={currentPage === page}
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  )
+                )}
+
                 <PaginationItem>
                   <PaginationNext
                     href="#"
                     onClick={(e) => {
                       e.preventDefault();
-                      if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+                      if (currentPage < totalPages)
+                        setCurrentPage(currentPage + 1);
                     }}
-                    className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
+                    className={
+                      currentPage === totalPages
+                        ? "pointer-events-none opacity-50"
+                        : ""
+                    }
                   />
                 </PaginationItem>
               </PaginationContent>
