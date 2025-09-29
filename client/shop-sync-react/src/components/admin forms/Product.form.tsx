@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -26,6 +27,7 @@ import {
   useCreateProductMutation,
   useUpdateProductMutation,
 } from "../../store/api/adminApi";
+import { toast } from "react-toastify";
 
 const productSchema = z.object({
   name: z.string().min(1, "Name is required").max(255, "Name too long"),
@@ -69,15 +71,15 @@ interface ProductFormProps {
   categories: Category[];
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: ProductFormValues) => void;
-  onUpdate?: (id: string, data: Partial<ProductFormValues>) => void;
+  onSubmit: (data: FormData) => void; // changed
+  onUpdate?: (id: string, data: FormData) => void; // changed
   isLoading?: boolean;
   mode: "create" | "edit";
 }
 
 export const ProductForm: React.FC<ProductFormProps> = ({
   product,
-  categories = [], // ✅ Provide default empty array
+  categories = [],
   isOpen,
   onOpenChange,
   onSubmit,
@@ -101,6 +103,9 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     },
   });
 
+  // ✅ Add state to track selected files
+  const [selectedImages, setSelectedImages] = useState<FileList | null>(null);
+
   const [createProduct, { isLoading: isCreating }] = useCreateProductMutation();
   const [updateProduct, { isLoading: isUpdating }] = useUpdateProductMutation();
 
@@ -109,19 +114,28 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 
     const formData = new FormData();
 
+    // ✅ Add all form fields except images
     Object.entries(data).forEach(([key, value]) => {
-      if (key === "images" && value instanceof FileList) {
-        console.log(`📁 Adding ${value.length} images`);
-        Array.from(value).forEach((file, index) => {
-          formData.append(`images[${index}]`, file);
-        });
-      } else if (value !== undefined && value !== null && value !== "") {
+      if (
+        key !== "images" &&
+        value !== undefined &&
+        value !== null &&
+        value !== ""
+      ) {
         console.log(`📝 Adding ${key}:`, value);
         formData.append(key, String(value));
       }
     });
 
-    // Add default values if missing
+    // ✅ Add images with proper array format
+    if (selectedImages && selectedImages.length > 0) {
+      console.log(`📁 Adding ${selectedImages.length} images`);
+      Array.from(selectedImages).forEach((file, index) => {
+        formData.append(`images[${index}]`, file); // keep only indexed format
+      });
+    }
+
+    // Add defaults
     if (!formData.has("status")) {
       formData.append("status", "active");
     }
@@ -129,7 +143,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       formData.append("stock_quantity", "0");
     }
 
-    // Debug FormData contents
+    // Debug FormData
     console.log("📦 FormData contents:");
     for (const [key, value] of formData.entries()) {
       console.log(
@@ -143,8 +157,38 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     } else {
       onSubmit(formData);
     }
+
     onOpenChange(false);
     form.reset();
+    setSelectedImages(null);
+  };
+
+  // ✅ Handle file input change with validation
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+
+    if (files) {
+      // Validate file sizes (5MB limit per file)
+      const maxSize = 5 * 1024 * 1024; // 5MB in bytes
+      const oversizedFiles = Array.from(files).filter(
+        (file) => file.size > maxSize
+      );
+
+      if (oversizedFiles.length > 0) {
+        toast.error(`Some files are too large. Maximum size is 5MB per file.`);
+        e.target.value = ""; // Clear the input
+        return;
+      }
+
+      // Validate file count
+      if (files.length > 5) {
+        toast.error("Maximum 5 images allowed.");
+        e.target.value = ""; // Clear the input
+        return;
+      }
+
+      setSelectedImages(files);
+    }
   };
 
   return (
@@ -174,7 +218,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                   {...form.register("name")}
                 />
                 {form.formState.errors.name && (
-                  <p className="text-sm text-destructive">
+                  <p className="text-xs text-red-500">
                     {form.formState.errors.name.message}
                   </p>
                 )}
@@ -245,60 +289,41 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             <h4 className="font-semibold">Organization</h4>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
+                {/* Category */}
                 <Label htmlFor="category">Category *</Label>
                 <Select
                   value={form.watch("category")}
-                  onValueChange={(value) => form.setValue("category", value)}
+                  onValueChange={(val) => form.setValue("category", val)}
                 >
                   <SelectTrigger>
-                    <SelectValue
-                      placeholder={
-                        categories.length === 0
-                          ? "Loading categories..."
-                          : "Select category"
-                      }
-                    />
+                    <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
-                    {categories.length === 0 ? (
-                      // non-empty value required by Radix; disabled so it can't be selected
-                      <SelectItem
-                        value="__no_categories"
-                        disabled
-                        className="text-sm text-muted-foreground"
-                      >
-                        No categories available. Please create a category first.
+                    {categories.map((c) => (
+                      <SelectItem key={c._id} value={c.name}>
+                        {c.name}
                       </SelectItem>
-                    ) : (
-                      // use the category _id as the value so the backend receives the id
-                      categories
-                        .filter((cat) => cat.status === "active")
-                        .map((category) => (
-                          <SelectItem key={category._id} value={category.name}>
-                            {category.name}
-                          </SelectItem>
-                        ))
-                    )}
+                    ))}
                   </SelectContent>
                 </Select>
                 {form.formState.errors.category && (
-                  <p className="text-sm text-destructive">
+                  <p className="text-xs text-red-500">
                     {form.formState.errors.category.message}
                   </p>
                 )}
                 {categories.length === 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    📝 Tip: Create categories first in the Categories tab before
-                    adding products.
+                  <p className="text-xs text-yellow-600">
+                    No categories available. Create categories first.
                   </p>
                 )}
               </div>
               <div className="space-y-2">
+                {/* Status */}
                 <Label htmlFor="status">Status</Label>
                 <Select
                   value={form.watch("status")}
-                  onValueChange={(value) =>
-                    form.setValue("status", value as "active" | "inactive")
+                  onValueChange={(v) =>
+                    form.setValue("status", v as "active" | "inactive")
                   }
                 >
                   <SelectTrigger>
@@ -323,11 +348,18 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 type="file"
                 multiple
                 accept="image/*"
-                {...form.register("images")}
+                onChange={handleImageChange} // ✅ Use custom handler
+                className="w-full p-2 border rounded-md"
               />
               <p className="text-xs text-muted-foreground">
-                You can upload up to 5 images (jpeg, png, jpg, gif, webp).
+                You can upload up to 5 images (jpeg, png, jpg, gif, webp). Max
+                5MB each.
               </p>
+              {selectedImages && selectedImages.length > 0 && (
+                <p className="text-sm text-green-600">
+                  {selectedImages.length} image(s) selected
+                </p>
+              )}
             </div>
           </div>
 

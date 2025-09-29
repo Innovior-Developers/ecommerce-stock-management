@@ -264,7 +264,7 @@ const adminBaseQuery = fetchBaseQuery({
       headers.set("authorization", `Bearer ${token}`);
     }
     headers.set("accept", "application/json");
-    headers.set("content-type", "application/json");
+    // ✅ Don't set content-type here - let it be auto-detected for FormData
     return headers;
   },
 });

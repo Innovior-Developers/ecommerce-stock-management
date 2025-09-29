@@ -4,13 +4,14 @@ import { cva } from "class-variance-authority";
 import { ChevronDown } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAppSelector } from "@/store/hooks";
 
 const NavigationMenu = React.forwardRef<
   React.ElementRef<typeof NavigationMenuPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof NavigationMenuPrimitive.Root>
 >(({ className, children, ...props }, ref) => {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAppSelector((state) => state.auth);
+
   // Render menu items based on user role
   return (
     <NavigationMenuPrimitive.Root

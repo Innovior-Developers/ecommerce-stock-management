@@ -31,6 +31,7 @@ export const adminApi = createApi({
         url: "/products",
         method: "POST",
         body: formData,
+        // ✅ Don't set content-type for FormData - let browser handle it
       }),
       invalidatesTags: ["Product", "Inventory"],
       // ✅ Add this to force refresh
@@ -43,11 +44,12 @@ export const adminApi = createApi({
       },
     }),
 
-    updateProduct: builder.mutation<unknown, { id: string; data: unknown }>({
+    updateProduct: builder.mutation<unknown, { id: string; data: FormData }>({
       query: ({ id, data }) => ({
         url: `/products/${id}`,
         method: "PUT",
         body: data,
+        // ✅ Don't set content-type for FormData
       }),
       invalidatesTags: ["Product", "Inventory"],
     }),

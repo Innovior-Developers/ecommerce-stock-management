@@ -153,24 +153,65 @@ class Product extends Model
     // Upload multiple images - IMPROVED VERSION
     public function uploadMultipleImages($files, $existingImages = [])
     {
-        $images = is_array($existingImages) ? $existingImages : [];
+        Log::info('=== Upload Multiple Images Debug ===');
+        Log::info('Files received: ' . count($files));
+        Log::info('Existing images: ' . count($existingImages));
 
-        // Handle single file or array of files
-        if (!is_array($files)) {
-            $files = [$files];
-        }
+        $disk = Storage::disk('s3');
+        $uploadedImages = $existingImages;
 
-        foreach ($files as $file) {
+        foreach ($files as $index => $file) {
+            Log::info("Processing file {$index}:");
+            Log::info("- Original name: " . $file->getClientOriginalName());
+            Log::info("- Size: " . $file->getSize());
+            Log::info("- MIME: " . $file->getMimeType());
+
             if ($file && $file->isValid()) {
-                $images = $this->uploadImage($file, $images);
+                try {
+                    // Generate unique filename
+                    $timestamp = time();
+                    $randomString = Str::random(8);
+                    $extension = $file->getClientOriginalExtension();
+                    $filename = "product-{$this->_id}-{$timestamp}_{$randomString}.{$extension}";
+                    $path = "products/{$filename}";
+
+                    Log::info("Uploading to S3 path: " . $path);
+
+                    // Upload to S3
+                    $uploaded = $disk->put($path, file_get_contents($file), [
+                        'ContentType' => $file->getMimeType(),
+                    ]);
+
+                    if ($uploaded) {
+                        // ✅ Construct S3 URL manually
+                        $bucket = config('filesystems.disks.s3.bucket');
+                        $region = config('filesystems.disks.s3.region');
+                        $url = "https://{$bucket}.s3.{$region}.amazonaws.com/{$path}";
+
+                        Log::info("Upload successful, URL: " . $url);
+
+                        $uploadedImages[] = [
+                            'url' => $url,
+                            'filename' => $filename,
+                            'original_name' => $file->getClientOriginalName(),
+                            'size' => $file->getSize(),
+                            'mime_type' => $file->getMimeType(),
+                        ];
+                    } else {
+                        Log::error("S3 upload failed for file: " . $file->getClientOriginalName());
+                    }
+                } catch (\Exception $e) {
+                    Log::error("Exception during file upload: " . $e->getMessage());
+                    Log::error("File: " . $file->getClientOriginalName());
+                    Log::error("Stack trace: " . $e->getTraceAsString());
+                }
             } else {
-                Log::warning('Invalid file skipped during upload', [
-                    'product_id' => $this->_id ?? 'unknown'
-                ]);
+                Log::warning("Invalid file at index {$index}");
             }
         }
 
-        return $images;
+        Log::info('Final uploaded images count: ' . count($uploadedImages));
+        return $uploadedImages;
     }
 
     // Delete images from S3 - IMPROVED VERSION

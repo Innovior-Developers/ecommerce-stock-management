@@ -1,0 +1,29 @@
+name: Samsung Galaxy S24 Ultra 512GB
+description: The ultimate Android experience with built-in S Pen, revolutionary AI camera, and the most powerful Galaxy performance yet. Features a stunning 6.8-inch Dynamic AMOLED 2X display and industry-leading 200MP camera system.
+price: 1399.99
+category: Electronics
+stock_quantity: 15
+status: active
+weight: 0.232
+meta_title: Samsung Galaxy S24 Ultra 512GB - AI-Powered Android Flagship
+meta_description: Discover Samsung's most advanced Galaxy with S Pen, 200MP camera, and AI features in titanium design.
+
+name: MacBook Pro 14-inch M3 Chip 1TB SSD
+description: Supercharged by the next-generation M3 chip, the 14-inch MacBook Pro delivers exceptional performance and up to 22 hours of battery life. Features a Liquid Retina XDR display, advanced camera and audio, and extensive connectivity.
+price: 2199.99
+category: Electronics
+stock_quantity: 8
+status: active
+weight: 1.55
+meta_title: MacBook Pro 14-inch M3 1TB - Professional Laptop for Creators
+meta_description: Unleash your creativity with MacBook Pro M3 featuring advanced performance, stunning display, and all-day battery life.
+
+name: Nike Air Jordan 1 Retro High OG "Chicago"
+description: The iconic basketball shoe that started it all. Premium leather construction with the classic Chicago colorway featuring white, black, and varsity red. A timeless design that transcends basketball and street fashion.
+price: 189.99
+category: Clothing
+stock_quantity: 45
+status: active
+weight: 0.85
+meta_title: Nike Air Jordan 1 Retro High OG Chicago - Iconic Basketball Sneakers
+meta_description: Own a piece of basketball history with the legendary Air Jordan 1 in the classic Chicago colorway.
