@@ -7,11 +7,17 @@ services:
     volumes:
       - ./ecommerce-stock-management:/var/www/html
     env_file:
-      - ./.env.docker
-    # ✅ Add DNS configuration
-    dns:
-      - 8.8.8.8
-      - 1.1.1.1
+      - ./.env.docker # This will load all variables from .env.docker
+    environment:
+      # These are needed for service linking
+      - DB_CONNECTION=mongodb
+      - DB_DATABASE=ecommerce_stock
+      - REDIS_HOST=redis
+      - CACHE_STORE=redis
+      - SESSION_DRIVER=redis
+      - QUEUE_CONNECTION=redis
+      - APP_ENV=local
+      - APP_DEBUG=true
     depends_on:
       - redis
     networks:

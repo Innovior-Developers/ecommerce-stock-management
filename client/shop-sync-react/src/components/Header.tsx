@@ -96,47 +96,32 @@ const Header = ({ isAdmin = false }: HeaderProps) => {
             </form>
           )}
 
-          {/* Navigation Links */}
-          <nav className="flex items-center space-x-4">
-            <Link
-              to="/"
-              className="hover:text-primary transition-colors duration-200"
-            >
+            {/* Navigation Links */}
+            <nav className="flex items-center space-x-4">
+            <Link to="/" className="hover:text-primary transition-colors duration-200">
               Home
             </Link>
-            <Link
-              to="/shop"
-              className="hover:text-primary transition-colors duration-200"
-            >
+            <Link to="/shop" className="hover:text-primary transition-colors duration-200">
               Shop
             </Link>
-            <Link
-              to="/deals"
-              className="hover:text-primary transition-colors duration-200"
-            >
+            <Link to="/deals" className="hover:text-primary transition-colors duration-200">
               Deals
             </Link>
-            <Link
-              to="/about"
-              className="hover:text-primary transition-colors duration-200"
-            >
+            <Link to="/about" className="hover:text-primary transition-colors duration-200">
               About
             </Link>
-            <Link
-              to="/contact"
-              className="hover:text-primary transition-colors duration-200"
-            >
+            <Link to="/contact" className="hover:text-primary transition-colors duration-200">
               Contact
             </Link>
             {isAuthenticated && user?.role === "admin" && (
               <Link
-                to="/admin"
-                className="hover:text-primary transition-colors duration-200 text-primary font-semibold"
+              to="/admin"
+              className="hover:text-primary transition-colors duration-200 text-primary font-semibold"
               >
-                Admin
+              Admin
               </Link>
             )}
-          </nav>
+            </nav>
 
           {/* Navigation Icons */}
           <div className="flex items-center space-x-4">

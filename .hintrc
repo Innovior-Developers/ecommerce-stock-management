@@ -5,12 +5,6 @@
   "hints": {
     "typescript-config/strict": "off",
     "typescript-config/consistent-casing": "off",
-    "typescript-config/is-valid": "off",
-    "axe/forms": [
-      "default",
-      {
-        "label": "off"
-      }
-    ]
+    "typescript-config/is-valid": "off"
   }
 }

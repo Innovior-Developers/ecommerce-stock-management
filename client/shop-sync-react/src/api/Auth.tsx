@@ -17,20 +17,23 @@ export interface RegisterData {
   phone?: string;
 }
 
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: "admin" | "customer";
+  avatar?: string;
+  provider?: string;
+}
+
 export interface AuthResponse {
   success: boolean;
   message: string;
+  user: User;
   token: string;
+  refresh_token?: string;
   token_type: string;
-  expires_in: number;
-  user: {
-    id: string;
-    name: string;
-    email: string;
-    role: "admin" | "customer";
-    status: string;
-    avatar?: string;
-  };
+  expires_in?: number;
 }
 
 // Base query with automatic token handling
@@ -41,8 +44,8 @@ const authBaseQuery = fetchBaseQuery({
     if (token) {
       headers.set("authorization", `Bearer ${token}`);
     }
-    headers.set("Accept", "application/json");
-    headers.set("Content-Type", "application/json");
+    headers.set("accept", "application/json");
+    headers.set("content-type", "application/json");
     return headers;
   },
 });
@@ -112,7 +115,7 @@ export const authApi = createApi({
               setCredentials({
                 user: data.user,
                 token: data.token,
-                refreshToken: (data as unknown).refresh_token,
+                refreshToken: data.refresh_token,
               })
             );
           }
@@ -137,7 +140,7 @@ export const authApi = createApi({
               setCredentials({
                 user: data.user,
                 token: data.token,
-                refreshToken: (data as unknown).refresh_token,
+                refreshToken: data.refresh_token,
               })
             );
           }
@@ -162,7 +165,7 @@ export const authApi = createApi({
               setCredentials({
                 user: data.user,
                 token: data.token,
-                refreshToken: (data as unknown).refresh_token,
+                refreshToken: data.refresh_token,
               })
             );
           }
@@ -173,23 +176,24 @@ export const authApi = createApi({
     }),
 
     // Get current user
-    getCurrentUser: builder.query<
-      { success: boolean; user: AuthResponse["user"] },
-      void
-    >({
+    getCurrentUser: builder.query<{ success: boolean; user: User }, void>({
       query: () => "/user",
       providesTags: ["User"],
     }),
 
     // Logout
     logout: builder.mutation<{ success: boolean; message: string }, void>({
-      query: () => ({ url: "/logout", method: "POST" }),
+      query: () => ({
+        url: "/logout",
+        method: "POST",
+      }),
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         try {
           await queryFulfilled;
+          dispatch(clearCredentials());
         } catch (error) {
-          console.error("Logout failed:", error);
-        } finally {
+          // Clear credentials even if API call fails
+          console.warn("Logout API failed, clearing local data anyway");
           dispatch(clearCredentials());
         }
       },
@@ -197,7 +201,10 @@ export const authApi = createApi({
 
     // Refresh token
     refreshToken: builder.mutation<AuthResponse, void>({
-      query: () => ({ url: "/refresh", method: "POST" }),
+      query: () => ({
+        url: "/refresh",
+        method: "POST",
+      }),
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
@@ -206,12 +213,12 @@ export const authApi = createApi({
               setCredentials({
                 user: data.user,
                 token: data.token,
-                refreshToken: (data as unknown).refresh_token,
+                refreshToken: data.refresh_token,
               })
             );
           }
         } catch (error) {
-          console.error("Refresh token failed:", error);
+          dispatch(clearCredentials());
         }
       },
     }),

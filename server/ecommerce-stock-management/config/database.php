@@ -41,9 +41,6 @@ return [
                 'database' => env('DB_AUTHENTICATION_DATABASE', 'admin'),
                 'retryWrites' => true,
                 'w' => 'majority',
-                // ✅ Disable SSL for this build
-                'ssl' => false,
-                'tls' => false,
             ],
         ],
 

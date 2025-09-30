@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Log; // ✅ Add this import
 use Illuminate\Validation\Rule;
 
 class ProductController extends Controller
@@ -69,47 +68,16 @@ class ProductController extends Controller
 
     public function store(Request $request)
     {
-        // ✅ Enhanced debug logging
-        Log::info('=== Product Creation Debug ===');
-        Log::info('Request method: ' . $request->method());
-        Log::info('Content type: ' . $request->header('content-type'));
-        Log::info('All data: ', $request->all());
-        Log::info('All files: ', $request->allFiles());
-        Log::info('Has images file: ' . ($request->hasFile('images') ? 'YES' : 'NO'));
-
-        // Check for both array format and individual files
-        $hasImagesArray = $request->hasFile('images');
-        $hasImageFiles = false;
-
-        // Check for images[0], images[1], etc.
-        for ($i = 0; $i < 5; $i++) {
-            if ($request->hasFile("images.{$i}")) {
-                $hasImageFiles = true;
-                Log::info("Found image file at index {$i}");
-                break;
-            }
-        }
-
-        Log::info("Images array format: " . ($hasImagesArray ? 'YES' : 'NO'));
-        Log::info("Images individual format: " . ($hasImageFiles ? 'YES' : 'NO'));
-
-        // ✅ Updated validation - handle both formats
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'required|string',
             'price' => 'required|numeric|min:0',
-            'sku' => 'nullable|string|unique:products,sku',
+            'sku' => 'nullable|string|unique:products,sku', // Made optional since auto-generated
             'category' => 'required|string',
             'stock_quantity' => 'nullable|integer|min:0',
             'status' => 'nullable|in:active,inactive',
-            // ✅ Handle both formats
-            'images' => 'nullable|array|max:5',
-            'images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
-            'images.0' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
-            'images.1' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
-            'images.2' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
-            'images.3' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
-            'images.4' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
+            'images' => 'nullable|array|max:5', // Allow multiple images
+            'images.*' => 'image|mimes:jpeg,png,jpg,gif,webp|max:5120', // 5MB max per image
             'weight' => 'nullable|numeric|min:0',
             'dimensions' => 'nullable|array',
             'meta_title' => 'nullable|string|max:255',
@@ -120,63 +88,27 @@ class ProductController extends Controller
         $validated['status'] = $validated['status'] ?? 'active';
         $validated['stock_quantity'] = $validated['stock_quantity'] ?? 0;
 
-        // ✅ Get images from both possible formats
-        $imageFiles = [];
-
-        // Try array format first
-        if ($request->hasFile('images') && is_array($request->file('images'))) {
-            $imageFiles = $request->file('images');
-            Log::info('Using array format images: ' . count($imageFiles));
-        } else {
-            // Try individual format
-            for ($i = 0; $i < 5; $i++) {
-                if ($request->hasFile("images.{$i}")) {
-                    $imageFiles[] = $request->file("images.{$i}");
-                    Log::info("Added individual image at index {$i}");
-                }
-            }
-        }
-
-        // Remove images from validated data
+        // Remove images from validated data for now
+        $images = $request->file('images', []);
         unset($validated['images']);
-
-        Log::info('Final image files count: ' . count($imageFiles));
 
         // Create product first
         $product = Product::create($validated);
 
-        // ✅ Upload images if any found
-        if (!empty($imageFiles)) {
-            Log::info('Starting image upload for product: ' . $product->_id);
+        // Upload images if provided
+        if ($request->hasFile('images')) {
+            $images = $request->file('images');
+            $uploadedImages = $product->uploadMultipleImages($images);
 
-            try {
-                $uploadedImages = $product->uploadMultipleImages($imageFiles);
-
-                if (!empty($uploadedImages)) {
-                    $product->update(['images' => $uploadedImages]);
-                    Log::info('Images uploaded successfully', [
-                        'count' => count($uploadedImages),
-                        'images' => $uploadedImages
-                    ]);
-                } else {
-                    Log::warning('Image upload returned empty array');
-                }
-            } catch (\Exception $e) {
-                Log::error('Image upload failed: ' . $e->getMessage());
-                Log::error('Stack trace: ' . $e->getTraceAsString());
-            }
-        } else {
-            Log::warning('No image files found to upload');
+            // ✅ Make sure this line exists and works
+            $product->update(['images' => $uploadedImages]);
         }
 
-        // Return fresh product with images
-        $freshProduct = $product->fresh();
-        Log::info('Final product data: ', $freshProduct->toArray());
-
+        // ✅ Return fresh product with images
         return response()->json([
             'success' => true,
             'message' => 'Product created successfully',
-            'data' => $freshProduct,
+            'data' => $product->fresh(), // This should include images
         ], 201);
     }
 

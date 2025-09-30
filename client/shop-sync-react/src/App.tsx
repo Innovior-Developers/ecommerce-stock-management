@@ -6,9 +6,6 @@ import { store } from "@/store";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AdminRoute from "@/components/AdminRoute";
-import { useGetCurrentUserQuery } from "@/store/api/authApi";
-import { useAppSelector } from "@/store/hooks";
-import { Loader2 } from "lucide-react"; // ✅ Add this import at the top
 
 // Import pages
 import Index from "./pages/Index";
@@ -111,46 +108,16 @@ const router = createBrowserRouter(
     future: {
       v7_startTransition: true,
       v7_relativeSplatPath: true,
-      v7_fetcherPersist: true,
-      v7_normalizeFormMethod: true,
-      v7_partialHydration: true,
-      v7_skipActionErrorRevalidation: true,
     },
   }
 );
 
-const AppInitializer = ({ children }: { children: React.ReactNode }) => {
-  const { token } = useAppSelector((state) => state.auth);
-
-  // Only fetch user if we have a token but no user data
-  const { data: userData, isLoading } = useGetCurrentUserQuery(undefined, {
-    skip: !token,
-  });
-
-  if (token && isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="animate-spin h-8 w-8" />
-      </div>
-    );
-  }
-
-  return <>{children}</>;
-};
-
 const App = () => (
   <Provider store={store}>
     <TooltipProvider>
-      <AppInitializer>
-        <Toaster />
-        <Sonner />
-        <RouterProvider
-          router={router}
-          future={{
-            v7_startTransition: true,
-          }}
-        />
-      </AppInitializer>
+      <Toaster />
+      <Sonner />
+      <RouterProvider router={router} />
     </TooltipProvider>
   </Provider>
 );
