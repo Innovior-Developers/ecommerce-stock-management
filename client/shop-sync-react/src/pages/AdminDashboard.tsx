@@ -60,56 +60,58 @@ import {
 } from "@/components/admin forms/Category.form";
 import { InventoryUpdateForm } from "@/components/admin forms/Inventory.form";
 import { CategoriesDebug } from "@/components/CategoriesDebug";
+import { Category } from "../types"; // ✅ Import the new type
+import ProductDetail from "@/components/admin forms/ProductDetail";
 
 const AdminDashboard = () => {
+  // All hooks at the top level
   const [activeTab, setActiveTab] = useState("overview");
-
-  // Form states
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
   const [isEditProductOpen, setIsEditProductOpen] = useState(false);
   const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
   const [isEditCategoryOpen, setIsEditCategoryOpen] = useState(false);
-
-  // Selected items for editing
   const [selectedProduct, setSelectedProduct] = useState<unknown>(null);
   const [selectedCategory, setSelectedCategory] = useState<unknown>(null);
-
-  // Search states
   const [productSearch, setProductSearch] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
   const [categorySearch, setCategorySearch] = useState("");
+  // Add your new states here:
+  const [isProductDetailOpen, setIsProductDetailOpen] = useState(false);
+  const [selectedViewProduct, setSelectedViewProduct] = useState<unknown>(null);
 
   // Get user from Redux state
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
 
   // RTK Query hooks
-  const {
-    data: productsResponse,
-    isLoading: productsLoading,
-  } = useGetProductsQuery({ search: productSearch }, { skip: !isAuthenticated });
+  const { data: productsResponse, isLoading: productsLoading } =
+    useGetProductsQuery({ search: productSearch }, { skip: !isAuthenticated });
 
   const {
     data: categoriesResponse,
     isLoading: categoriesLoading,
     error: categoriesError,
-  } = useGetCategoriesQuery({ search: categorySearch }, { skip: !isAuthenticated });
+  } = useGetCategoriesQuery(
+    { search: categorySearch },
+    { skip: !isAuthenticated }
+  );
 
-  const {
-    data: customersResponse,
-    isLoading: customersLoading,
-  } = useGetCustomersQuery({ search: customerSearch }, { skip: !isAuthenticated });
+  const { data: customersResponse, isLoading: customersLoading } =
+    useGetCustomersQuery(
+      { search: customerSearch },
+      { skip: !isAuthenticated }
+    );
 
-  const {
-    data: ordersResponse,
-    isLoading: ordersLoading,
-  } = useGetOrdersQuery(undefined, { skip: !isAuthenticated });
+  const { data: ordersResponse, isLoading: ordersLoading } = useGetOrdersQuery(
+    undefined,
+    { skip: !isAuthenticated }
+  );
 
-  const { data: lowStockResponse } = useGetLowStockQuery(undefined, { skip: !isAuthenticated });
+  const { data: lowStockResponse } = useGetLowStockQuery(undefined, {
+    skip: !isAuthenticated,
+  });
 
-  const {
-    data: stockLevelsResponse,
-    isLoading: stockLevelsLoading,
-  } = useGetStockLevelsQuery(undefined, { skip: !isAuthenticated });
+  const { data: stockLevelsResponse, isLoading: stockLevelsLoading } =
+    useGetStockLevelsQuery(undefined, { skip: !isAuthenticated });
 
   // Mutations
   const [createProduct] = useCreateProductMutation();
@@ -122,7 +124,8 @@ const AdminDashboard = () => {
 
   // Extract data with proper fallbacks
   const products = productsResponse?.data?.data || productsResponse?.data || [];
-  const categories = categoriesResponse?.data?.data || categoriesResponse?.data || [];
+  const categories =
+    categoriesResponse?.data?.data || categoriesResponse?.data || [];
   const customers =
     customersResponse?.data?.data || customersResponse?.data || [];
   const orders = ordersResponse?.data?.data || ordersResponse?.data || [];
@@ -134,7 +137,7 @@ const AdminDashboard = () => {
     categoriesResponse,
     categories,
     categoriesLoading,
-    categoriesError
+    categoriesError,
   });
 
   // Handle mutations
@@ -292,6 +295,12 @@ const AdminDashboard = () => {
     );
   }
 
+  // Add this function to handle view product
+  const handleViewProduct = (product: unknown) => {
+    setSelectedViewProduct(product);
+    setIsProductDetailOpen(true);
+  };
+
   return (
     <div className="min-h-screen bg-muted/30">
       <Header isAdmin={true} />
@@ -441,7 +450,7 @@ const AdminDashboard = () => {
                           </Badge>
                         </div>
                       ))
-                  )}
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -511,6 +520,7 @@ const AdminDashboard = () => {
                           setIsEditProductOpen(true);
                         }}
                         onDelete={(id) => handleDeleteProduct(id)}
+                        onView={handleViewProduct} // Add this line
                       />
                     ))}
                   </div>
@@ -547,37 +557,21 @@ const AdminDashboard = () => {
               </CardHeader>
               <CardContent>
                 {categoriesLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-8 w-8 animate-spin" />
-                  </div>
-                ) : categories.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Tag className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-semibold">
-                      No categories found
-                    </h3>
-                    <p className="text-muted-foreground">
-                      Create categories to organize your products.
-                    </p>
-                    <Button
-                      onClick={() => setIsAddCategoryOpen(true)}
-                      className="mt-4"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Category
-                    </Button>
-                  </div>
+                  <p>Loading categories...</p>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {categories.map((category: unknown) => (
+                    {categories.map((category: Category) => (
                       <CategoryCard
-                        key={category._id}
+                        key={category._id} // ✅ FIX: Add the unique key
                         category={category}
                         onEdit={(category) => {
                           setSelectedCategory(category);
                           setIsEditCategoryOpen(true);
                         }}
                         onDelete={(id) => handleDeleteCategory(id)}
+                        onView={() => {
+                          /* Optional: Implement view logic */
+                        }}
                       />
                     ))}
                   </div>
@@ -857,7 +851,7 @@ const AdminDashboard = () => {
         </Tabs>
       </main>
 
-<CategoriesDebug /> 
+      <CategoriesDebug />
       {/* Forms */}
       <ProductForm
         isOpen={isAddProductOpen}
@@ -897,6 +891,12 @@ const AdminDashboard = () => {
         category={selectedCategory} // ✅ Correct prop name
         categories={categories || []} // ✅ Provide fallback
         mode="edit"
+      />
+
+      <ProductDetail
+        product={selectedViewProduct}
+        isOpen={isProductDetailOpen}
+        onOpenChange={setIsProductDetailOpen}
       />
     </div>
   );

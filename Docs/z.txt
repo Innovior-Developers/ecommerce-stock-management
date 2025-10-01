@@ -37,4 +37,5 @@ By understanding them you will have a strong fundamental understanding.
 The components listed above all tie together to produce a simple system for developers to automate the deployment, scaling, and management of applications. This has led Docker to become a powerful and important tool in modern software development.
 
 
+docker-compose restart laravel
 

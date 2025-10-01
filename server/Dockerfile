@@ -20,8 +20,10 @@ RUN apt-get update && apt-get install -y \
     openssl \
     libcurl4-openssl-dev \
     redis-tools \
+    dos2unix \
     && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    ca-certificates
 
 # Install PHP extensions
 RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip curl
@@ -29,6 +31,14 @@ RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip curl
 # Install MongoDB and Redis PHP extensions
 RUN pecl install mongodb redis \
     && docker-php-ext-enable mongodb redis
+
+# ✅ ADD: Configure PHP for large file uploads
+RUN echo "upload_max_filesize = 10M" >> /usr/local/etc/php/conf.d/uploads.ini \
+    && echo "post_max_size = 50M" >> /usr/local/etc/php/conf.d/uploads.ini \
+    && echo "max_file_uploads = 10" >> /usr/local/etc/php/conf.d/uploads.ini \
+    && echo "memory_limit = 256M" >> /usr/local/etc/php/conf.d/uploads.ini \
+    && echo "max_execution_time = 300" >> /usr/local/etc/php/conf.d/uploads.ini \
+    && echo "max_input_time = 300" >> /usr/local/etc/php/conf.d/uploads.ini
 
 # Get latest Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -50,6 +60,7 @@ RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cac
 # Copy Nginx config and startup script
 COPY ./nginx.conf /etc/nginx/nginx.conf
 COPY ./start.sh /start.sh
+RUN dos2unix /start.sh
 RUN chmod +x /start.sh
 
 # Expose port 8000

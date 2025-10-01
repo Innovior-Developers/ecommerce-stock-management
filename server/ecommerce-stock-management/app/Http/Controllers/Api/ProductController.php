@@ -6,10 +6,106 @@ use App\Http\Controllers\Controller;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Http\UploadedFile;
 
 class ProductController extends Controller
 {
+    public function store(Request $request)
+    {
+        Log::info('=== PRODUCT CREATION REQUEST START ===');
+        Log::info('Content-Type: ' . $request->header('Content-Type'));
+        Log::info('All request data (except files):', $request->except(array_keys($request->allFiles())));
+        Log::info('All files received by Laravel:', array_keys($request->allFiles()));
+
+        // IMPROVED: Gather image files with better detection
+        $imageFiles = [];
+        $allFiles = $request->allFiles();
+
+        // Check for 'images' (plural) key
+        if (isset($allFiles['images'])) {
+            $imageFiles = is_array($allFiles['images']) ? $allFiles['images'] : [$allFiles['images']];
+            Log::info('Found ' . count($imageFiles) . ' files under "images" key');
+        }
+        // Check for 'image' (singular) key as fallback
+        else if (isset($allFiles['image'])) {
+            $imageFiles = is_array($allFiles['image']) ? $allFiles['image'] : [$allFiles['image']];
+            Log::info('Found ' . count($imageFiles) . ' files under "image" key');
+        }
+        // Look for any indexed keys like images[0], image[0]
+        else {
+            foreach ($allFiles as $key => $value) {
+                if (strpos($key, 'image') === 0) {
+                    $imageFiles[] = $value;
+                    Log::info('Found file with key: ' . $key);
+                }
+            }
+        }
+
+        if (empty($imageFiles)) {
+            Log::warning('No image files detected in the request');
+        } else {
+            Log::info('Total image files found: ' . count($imageFiles));
+        }
+
+        // Validate text fields first
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'description' => 'required|string',
+            'price' => 'required|numeric|min:0',
+            'category' => 'required|string',
+            'stock_quantity' => 'required|integer|min:0',
+            'status' => 'sometimes|in:active,inactive',
+            'weight' => 'nullable|numeric|min:0',
+            'meta_title' => 'nullable|string|max:255',
+            'meta_description' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            Log::error('Validation failed', ['errors' => $validator->errors()]);
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        // Create the product
+        $validatedData = $validator->validated();
+        if (!isset($validatedData['status'])) {
+            $validatedData['status'] = 'active';
+        }
+
+        $product = new Product($validatedData);
+        $product->save();
+
+        Log::info('Product created with ID: ' . $product->_id);
+
+        // Process image files if they exist
+        if (!empty($imageFiles)) {
+            Log::info('Attempting to upload ' . count($imageFiles) . ' images');
+            $uploadedImages = $product->uploadMultipleImages($imageFiles);
+
+            if (!empty($uploadedImages)) {
+                Log::info('Successfully uploaded ' . count($uploadedImages) . ' images');
+                $product->images = $uploadedImages;
+                $product->save();
+                Log::info('Saved image URLs to product');
+            } else {
+                Log::error('Failed to upload images');
+            }
+        }
+
+        // Clear cache and return response
+        Cache::tags(['products'])->flush();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Product created successfully',
+            'data' => $product->fresh()
+        ], 201);
+    }
+
     public function index(Request $request)
     {
         $cacheKey = 'products_' . md5(serialize($request->all()));
@@ -17,47 +113,26 @@ class ProductController extends Controller
         $products = Cache::remember($cacheKey, 600, function () use ($request) {
             $query = Product::query();
 
-            // Filter by category
-            if ($request->has('category')) {
-                $query->where('category', $request->category);
-            }
-
-            // Search functionality
-            if ($request->has('search')) {
-                $search = $request->search;
+            // Search filter
+            if ($search = $request->get('search')) {
                 $query->where(function ($q) use ($search) {
-                    $q->where('name', 'regex', "/$search/i")
-                        ->orWhere('description', 'regex', "/$search/i")
-                        ->orWhere('sku', 'regex', "/$search/i");
+                    $q->where('name', 'like', "%{$search}%")
+                        ->orWhere('description', 'like', "%{$search}%")
+                        ->orWhere('sku', 'like', "%{$search}%");
                 });
             }
 
-            // Filter by status
-            if ($request->has('status')) {
-                $query->where('status', $request->status);
-            } else {
-                $query->where('status', 'active'); // Default to active products
+            // Category filter
+            if ($category = $request->get('category')) {
+                $query->where('category', $category);
             }
 
-            // Stock filter
-            if ($request->has('in_stock')) {
-                $query->where('stock_quantity', '>', 0);
+            // Status filter
+            if ($status = $request->get('status')) {
+                $query->where('status', $status);
             }
 
-            // Price range filter
-            if ($request->has('min_price')) {
-                $query->where('price', '>=', $request->min_price);
-            }
-            if ($request->has('max_price')) {
-                $query->where('price', '<=', $request->max_price);
-            }
-
-            // Sorting
-            $sortBy = $request->get('sort_by', 'created_at');
-            $sortOrder = $request->get('sort_order', 'desc');
-            $query->orderBy($sortBy, $sortOrder);
-
-            return $query->paginate($request->get('per_page', 20));
+            return $query->latest()->paginate($request->get('per_page', 20));
         });
 
         return response()->json([
@@ -66,56 +141,10 @@ class ProductController extends Controller
         ]);
     }
 
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'required|string',
-            'price' => 'required|numeric|min:0',
-            'sku' => 'nullable|string|unique:products,sku', // Made optional since auto-generated
-            'category' => 'required|string',
-            'stock_quantity' => 'nullable|integer|min:0',
-            'status' => 'nullable|in:active,inactive',
-            'images' => 'nullable|array|max:5', // Allow multiple images
-            'images.*' => 'image|mimes:jpeg,png,jpg,gif,webp|max:5120', // 5MB max per image
-            'weight' => 'nullable|numeric|min:0',
-            'dimensions' => 'nullable|array',
-            'meta_title' => 'nullable|string|max:255',
-            'meta_description' => 'nullable|string',
-        ]);
-
-        // Set defaults
-        $validated['status'] = $validated['status'] ?? 'active';
-        $validated['stock_quantity'] = $validated['stock_quantity'] ?? 0;
-
-        // Remove images from validated data for now
-        $images = $request->file('images', []);
-        unset($validated['images']);
-
-        // Create product first
-        $product = Product::create($validated);
-
-        // Upload images if provided
-        if ($request->hasFile('images')) {
-            $images = $request->file('images');
-            $uploadedImages = $product->uploadMultipleImages($images);
-
-            // ✅ Make sure this line exists and works
-            $product->update(['images' => $uploadedImages]);
-        }
-
-        // ✅ Return fresh product with images
-        return response()->json([
-            'success' => true,
-            'message' => 'Product created successfully',
-            'data' => $product->fresh(), // This should include images
-        ], 201);
-    }
-
     public function show($id)
     {
         $product = Cache::remember("product_{$id}", 600, function () use ($id) {
-            return Product::with('inventory')->findOrFail($id);
+            return Product::findOrFail($id);
         });
 
         return response()->json([
@@ -124,63 +153,49 @@ class ProductController extends Controller
         ]);
     }
 
-    public function update(Request $request, $id)
+    public function update(Request $request, Product $product)
     {
-        $product = Product::findOrFail($id);
-
-        $validated = $request->validate([
-            'name' => 'nullable|string|max:255',
-            'description' => 'nullable|string',
-            'price' => 'nullable|numeric|min:0',
-            'sku' => ['nullable', 'string', Rule::unique('products')->ignore($id, '_id')],
-            'category' => 'nullable|string',
-            'stock_quantity' => 'nullable|integer|min:0',
-            'status' => 'nullable|in:active,inactive',
-            'new_images' => 'nullable|array|max:5',
-            'new_images.*' => 'image|mimes:jpeg,png,jpg,gif,webp|max:5120',
-            'remove_images' => 'nullable|array', // Array of image indices to remove
-            'remove_images.*' => 'integer',
+        $validator = Validator::make($request->all(), [
+            'name' => 'sometimes|required|string|max:255',
+            'description' => 'sometimes|required|string',
+            'price' => 'sometimes|required|numeric|min:0',
+            'category' => 'sometimes|required|string',
+            'stock_quantity' => 'sometimes|required|integer|min:0',
+            'status' => 'sometimes|required|in:active,inactive',
             'weight' => 'nullable|numeric|min:0',
-            'dimensions' => 'nullable|array',
             'meta_title' => 'nullable|string|max:255',
             'meta_description' => 'nullable|string',
         ]);
 
-        // Handle image removals
-        if ($request->has('remove_images')) {
-            $removeImages = $request->input('remove_images');
-            // Sort in descending order to avoid index issues
-            rsort($removeImages);
-
-            foreach ($removeImages as $imageIndex) {
-                $product->deleteImage($imageIndex);
-            }
-
-            // Refresh product data
-            $product = $product->fresh();
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
         }
+
+        $validatedData = $validator->validated();
+        $product->fill($validatedData);
 
         // Handle new images
-        $newImages = $request->file('new_images', []);
-        if (!empty($newImages)) {
+        if ($request->hasFile('images')) {
+            $files = $request->file('images');
+            if (!is_array($files)) {
+                $files = [$files];
+            }
+
             $existingImages = $product->images ?? [];
-            $updatedImages = $product->uploadMultipleImages($newImages, $existingImages);
-            $validated['images'] = $updatedImages;
+            $newImages = $product->uploadMultipleImages($files, $existingImages);
+            $product->images = $newImages;
         }
 
-        // Remove image-related fields from validated data
-        unset($validated['new_images'], $validated['remove_images']);
+        $product->save();
 
-        $product->update($validated);
-
-        // Clear cache
-        Cache::forget("product_{$id}");
+        // Clear caches
+        Cache::forget("product_{$product->_id}");
         Cache::tags(['products'])->flush();
 
         return response()->json([
             'success' => true,
             'message' => 'Product updated successfully',
-            'data' => $product->fresh(),
+            'data' => $product->fresh()
         ]);
     }
 
@@ -188,35 +203,28 @@ class ProductController extends Controller
     {
         $product = Product::findOrFail($id);
 
-        // Check if product has orders
-        $hasOrders = \App\Models\Order::where('items.product_id', $id)->exists();
-        if ($hasOrders) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Cannot delete product that has been ordered',
-            ], 400);
-        }
+        // Delete all images from S3
+        $product->deleteImages();
 
-        $product->delete(); // This will trigger deleteImages() in the model
+        $product->delete();
 
-        // Clear cache
         Cache::forget("product_{$id}");
         Cache::tags(['products'])->flush();
 
         return response()->json([
             'success' => true,
-            'message' => 'Product deleted successfully',
+            'message' => 'Product deleted successfully'
         ]);
     }
 
-    // Additional endpoint to upload images separately
+    // Upload additional images to existing product
     public function uploadImages(Request $request, $id)
     {
         $product = Product::findOrFail($id);
 
         $request->validate([
             'images' => 'required|array|max:5',
-            'images.*' => 'image|mimes:jpeg,png,jpg,gif,webp|max:5120',
+            'images.*' => 'image|mimes:jpeg,png,jpg,gif,webp|max:10240',
         ]);
 
         $existingImages = $product->images ?? [];

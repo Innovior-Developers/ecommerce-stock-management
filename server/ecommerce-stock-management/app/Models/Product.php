@@ -90,11 +90,22 @@ class Product extends Model
     // Upload image to S3 - FIXED VERSION with proper URL generation
     public function uploadImage($file, $existingImages = [])
     {
-        if (!$file) return $existingImages;
+        Log::info('uploadImage called', [
+            'file_valid' => $file && $file->isValid(),
+            'file_name' => $file ? $file->getClientOriginalName() : 'null',
+            'file_size' => $file ? $file->getSize() : 'null',
+            'existing_images_count' => count($existingImages)
+        ]);
+
+        if (!$file || !$file->isValid()) {
+            Log::warning('Invalid file provided to uploadImage');
+            return $existingImages;
+        }
 
         try {
-            // Ensure product has an ID (save if needed)
+            // Ensure product has an ID
             if (!$this->_id) {
+                Log::info('Product has no ID, saving first');
                 $this->save();
             }
 
@@ -105,46 +116,60 @@ class Product extends Model
             $filename = $timestamp . '_' . $randomString . '.' . $extension;
             $relativePath = 'products/' . $this->_id . '/' . $filename;
 
+            Log::info('Attempting S3 upload', [
+                'product_id' => $this->_id,
+                'filename' => $filename,
+                'path' => $relativePath,
+                'file_size' => $file->getSize(),
+                'mime_type' => $file->getMimeType()
+            ]);
+
             // Upload file to S3
             $uploadResult = Storage::disk('s3')->put($relativePath, file_get_contents($file), [
-                'visibility' => 'public',
                 'ContentType' => $file->getMimeType(),
                 'CacheControl' => 'max-age=31536000',
             ]);
 
+            Log::info('S3 upload result', ['success' => $uploadResult]);
+
             if (!$uploadResult) {
-                Log::error('Failed to upload file to S3');
+                Log::error('S3 upload failed - Storage::put returned false');
                 return $existingImages;
             }
 
-            // Construct URL manually
+            // Construct URL
             $bucket = config('filesystems.disks.s3.bucket');
             $region = config('filesystems.disks.s3.region');
-            $customUrl = config('filesystems.disks.s3.url');
+            $fullUrl = "https://{$bucket}.s3.{$region}.amazonaws.com/{$relativePath}";
 
-            if ($customUrl) {
-                $fullUrl = rtrim($customUrl, '/') . '/' . ltrim($relativePath, '/');
-            } else {
-                $fullUrl = "https://{$bucket}.s3.{$region}.amazonaws.com/{$relativePath}";
-            }
+            Log::info('Generated S3 URL', ['url' => $fullUrl]);
 
             // Add to existing images array
             $images = is_array($existingImages) ? $existingImages : [];
-            $images[] = [
+            $newImage = [
                 'url' => $fullUrl,
                 'path' => $relativePath,
                 'filename' => $filename,
                 'size' => $file->getSize(),
                 'mime_type' => $file->getMimeType(),
                 'uploaded_at' => now()->toISOString(),
-                'is_primary' => empty($images), // First image is primary
+                'is_primary' => empty($images),
             ];
+
+            $images[] = $newImage;
+
+            Log::info('Image added to array', [
+                'new_image' => $newImage,
+                'total_images' => count($images)
+            ]);
 
             return $images;
         } catch (\Exception $e) {
-            Log::error('Image upload failed: ' . $e->getMessage(), [
+            Log::error('Image upload exception', [
+                'message' => $e->getMessage(),
                 'file_name' => $file->getClientOriginalName() ?? 'unknown',
                 'product_id' => $this->_id ?? 'unknown',
+                'trace' => $e->getTraceAsString()
             ]);
             return $existingImages;
         }

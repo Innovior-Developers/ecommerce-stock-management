@@ -30,18 +30,20 @@ interface ProductCardProps {
 }
 
 const ProductCard = ({ product, ...props }: ProductCardProps) => {
+  // ✅ Corrected and simplified image URL logic
   const imageUrl =
     product.images && product.images.length > 0
       ? product.images[0].url
-      : product.image_url || product.image || "/assets/default-product.jpg";
+      : product.image_url || "/assets/default-product.jpg";
 
   const getStockStatus = () => {
-    if (product.stock === 0)
+    // The property is stock_quantity, not stock
+    if (product.stock_quantity === 0)
       return { status: "out", label: "Out of Stock", className: "stock-out" };
-    if (product.stock <= 5)
+    if (product.stock_quantity <= 5)
       return {
         status: "low",
-        label: `${product.stock} left`,
+        label: `${product.stock_quantity} left`,
         className: "stock-low",
       };
     return { status: "in", label: "In Stock", className: "stock-in" };

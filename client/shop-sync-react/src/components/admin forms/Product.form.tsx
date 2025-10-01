@@ -56,6 +56,13 @@ interface Product {
   meta_title?: string;
   meta_description?: string;
   created_at: string;
+  sku?: string;
+  images?: Array<{
+    url: string;
+    is_primary?: boolean;
+    filename?: string;
+    path?: string;
+  }>;
 }
 
 interface Category {
@@ -107,12 +114,44 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   const handleSubmit = (data: ProductFormValues) => {
     console.log("🔍 Form data before processing:", data);
 
+    // ✅ ADD: Client-side file size validation
+    if (data.images && data.images instanceof FileList) {
+      const files = Array.from(data.images);
+      const maxFileSize = 10 * 1024 * 1024; // 10MB in bytes
+      const maxTotalSize = 50 * 1024 * 1024; // 50MB in bytes
+
+      let totalSize = 0;
+
+      for (const file of files) {
+        if (file.size > maxFileSize) {
+          toast.error(
+            `File "${file.name}" is too large. Maximum size is 10MB per image.`
+          );
+          return;
+        }
+        totalSize += file.size;
+      }
+
+      if (totalSize > maxTotalSize) {
+        toast.error(
+          `Total file size is too large. Maximum total size is 50MB.`
+        );
+        return;
+      }
+
+      if (files.length > 5) {
+        toast.error("You can upload maximum 5 images per product.");
+        return;
+      }
+    }
+
     const formData = new FormData();
 
     Object.entries(data).forEach(([key, value]) => {
       if (key === "images" && value instanceof FileList) {
         console.log(`📁 Adding ${value.length} images`);
         Array.from(value).forEach((file, index) => {
+          // Ensure we use 'images[index]' format exactly
           formData.append(`images[${index}]`, file);
         });
       } else if (value !== undefined && value !== null && value !== "") {
@@ -326,7 +365,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 {...form.register("images")}
               />
               <p className="text-xs text-muted-foreground">
-                You can upload up to 5 images (jpeg, png, jpg, gif, webp).
+                ✅ UPDATED: You can upload up to 5 images (jpeg, png, jpg, gif,
+                webp). Maximum 10MB per image, 50MB total.
               </p>
             </div>
           </div>
@@ -393,6 +433,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onDelete,
   onView,
 }) => {
+  // Get the primary image URL
+  const imageUrl =
+    product.images && product.images.length > 0
+      ? product.images[0].url
+      : product.image_url || "/placeholder.svg";
+
   const getStockStatusColor = (quantity: number) => {
     if (quantity <= 0) return "bg-red-500";
     if (quantity <= 5) return "bg-orange-500";
@@ -409,7 +455,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
   return (
     <Card className="hover:shadow-lg transition-shadow">
-      <CardHeader>
+      <CardHeader className="pb-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
@@ -420,7 +466,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 {product.name}
               </CardTitle>
               <p className="text-sm text-muted-foreground">
-                SKU: {product.sku}
+                SKU: {product.sku || "N/A"}
               </p>
             </div>
           </div>
@@ -431,7 +477,19 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           </Badge>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-4">
+        {/* Add product image */}
+        <div className="mb-4 overflow-hidden rounded-md border">
+          <img
+            src={imageUrl}
+            alt={product.name}
+            className="h-48 w-full object-cover"
+            onError={(e) => {
+              e.currentTarget.src = "/placeholder.svg";
+            }}
+          />
+        </div>
+
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground line-clamp-2">
             {product.description}
