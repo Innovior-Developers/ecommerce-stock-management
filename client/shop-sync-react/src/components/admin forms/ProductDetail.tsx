@@ -10,18 +10,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { DollarSign, Package, Calendar, Tag, ShoppingBag } from "lucide-react";
+import { DollarSign, Package } from "lucide-react";
 
 interface Product {
   _id: string;
   name: string;
   description: string;
-  price: number;
+  price: number | string; // ✅ Allow both types
   category: string;
-  stock_quantity: number;
+  stock_quantity: number | string; // ✅ Allow both types
   status: string;
   image_url?: string;
-  weight?: number;
+  weight?: number | string; // ✅ Allow both types
   meta_title?: string;
   meta_description?: string;
   created_at: string;
@@ -42,6 +42,26 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
 }) => {
   if (!product) return null;
 
+  // ✅ Helper functions to safely parse numbers
+  const parsePrice = (price: number | string | undefined): number => {
+    if (price === undefined || price === null) return 0;
+    const parsed = typeof price === "string" ? parseFloat(price) : price;
+    return isNaN(parsed) ? 0 : parsed;
+  };
+
+  const parseQuantity = (quantity: number | string | undefined): number => {
+    if (quantity === undefined || quantity === null) return 0;
+    const parsed =
+      typeof quantity === "string" ? parseInt(quantity, 10) : quantity;
+    return isNaN(parsed) ? 0 : parsed;
+  };
+
+  const parseWeight = (weight: number | string | undefined): number => {
+    if (weight === undefined || weight === null) return 0;
+    const parsed = typeof weight === "string" ? parseFloat(weight) : weight;
+    return isNaN(parsed) ? 0 : parsed;
+  };
+
   // Get all product images
   const images =
     product.images && product.images.length > 0
@@ -57,6 +77,11 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
       day: "numeric",
     });
   };
+
+  // ✅ Parse values safely
+  const productPrice = parsePrice(product.price);
+  const productStock = parseQuantity(product.stock_quantity);
+  const productWeight = parseWeight(product.weight);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -127,7 +152,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
                           <div className="flex items-center gap-1">
                             <DollarSign className="h-4 w-4 text-green-600" />
                             <span className="font-medium">
-                              ${product.price.toFixed(2)}
+                              ${productPrice.toFixed(2)}
                             </span>
                           </div>
                         </div>
@@ -136,17 +161,17 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
                           <div className="flex items-center gap-2">
                             <div
                               className={`w-2 h-2 rounded-full ${getStockStatusColor(
-                                product.stock_quantity
+                                productStock
                               )}`}
                             />
-                            <span>{product.stock_quantity} units</span>
+                            <span>{productStock} units</span>
                           </div>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-sm">Weight</span>
                           <span>
-                            {product.weight
-                              ? `${product.weight} kg`
+                            {productWeight > 0
+                              ? `${productWeight.toFixed(2)} kg`
                               : "Not specified"}
                           </span>
                         </div>

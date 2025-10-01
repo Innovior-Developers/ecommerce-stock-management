@@ -1,6 +1,8 @@
+import { useState, useEffect } from "react"; // Add useState
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -21,12 +23,13 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Package, Edit, Trash2, Eye, DollarSign } from "lucide-react";
+import { Package, Edit, Trash2, Eye, DollarSign, X } from "lucide-react";
 import {
   useCreateProductMutation,
   useUpdateProductMutation,
 } from "../../store/api/adminApi";
 
+// Update the schema to handle images better
 const productSchema = z.object({
   name: z.string().min(1, "Name is required").max(255, "Name too long"),
   description: z.string().min(1, "Description is required"),
@@ -38,13 +41,13 @@ const productSchema = z.object({
   weight: z.number().min(0).optional(),
   meta_title: z.string().max(255).optional(),
   meta_description: z.string().optional(),
-  images: z.any().optional(),
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
 
 interface Product {
-  _id: string;
+  _id?: string; // ✅ Make optional
+  id?: string; // ✅ Add this as optional
   name: string;
   description: string;
   price: number;
@@ -84,7 +87,7 @@ interface ProductFormProps {
 
 export const ProductForm: React.FC<ProductFormProps> = ({
   product,
-  categories = [], // ✅ Provide default empty array
+  categories = [],
   isOpen,
   onOpenChange,
   onSubmit,
@@ -92,6 +95,13 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   isLoading = false,
   mode,
 }) => {
+  // State for managing images
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [existingImages, setExistingImages] = useState<
+    Array<{ url: string; filename?: string }>
+  >(product?.images || []);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
     defaultValues: {
@@ -111,54 +121,124 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   const [createProduct, { isLoading: isCreating }] = useCreateProductMutation();
   const [updateProduct, { isLoading: isUpdating }] = useUpdateProductMutation();
 
-  const handleSubmit = (data: ProductFormValues) => {
-    console.log("🔍 Form data before processing:", data);
+  // Reset form and images when product changes or modal opens/closes
+  useEffect(() => {
+    if (isOpen && product && mode === "edit") {
+      form.reset({
+        name: product.name,
+        description: product.description,
+        price: product.price,
+        category: product.category,
+        stock_quantity: product.stock_quantity,
+        status: product.status as "active" | "inactive",
+        image_url: product.image_url || "",
+        weight: product.weight || 0,
+        meta_title: product.meta_title || "",
+        meta_description: product.meta_description || "",
+      });
+      setExistingImages(product.images || []);
+      setSelectedFiles([]);
+      setImagePreviews([]);
+    } else if (isOpen && mode === "create") {
+      form.reset({
+        name: "",
+        description: "",
+        price: 0,
+        category: "",
+        stock_quantity: 0,
+        status: "active",
+        image_url: "",
+        weight: 0,
+        meta_title: "",
+        meta_description: "",
+      });
+      setExistingImages([]);
+      setSelectedFiles([]);
+      setImagePreviews([]);
+    }
+  }, [isOpen, product, mode, form]);
 
-    // ✅ ADD: Client-side file size validation
-    if (data.images && data.images instanceof FileList) {
-      const files = Array.from(data.images);
-      const maxFileSize = 10 * 1024 * 1024; // 10MB in bytes
-      const maxTotalSize = 50 * 1024 * 1024; // 50MB in bytes
+  // Handle file selection
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
 
-      let totalSize = 0;
+    const newFiles = Array.from(files);
+    const totalImages =
+      selectedFiles.length + existingImages.length + newFiles.length;
 
-      for (const file of files) {
-        if (file.size > maxFileSize) {
-          toast.error(
-            `File "${file.name}" is too large. Maximum size is 10MB per image.`
-          );
-          return;
-        }
-        totalSize += file.size;
-      }
+    if (totalImages > 5) {
+      toast.error(
+        `You can only upload up to 5 images. Currently you have ${
+          selectedFiles.length + existingImages.length
+        } images.`
+      );
+      return;
+    }
 
-      if (totalSize > maxTotalSize) {
+    // Validate file sizes
+    const maxFileSize = 10 * 1024 * 1024; // 10MB
+    for (const file of newFiles) {
+      if (file.size > maxFileSize) {
         toast.error(
-          `Total file size is too large. Maximum total size is 50MB.`
+          `File "${file.name}" is too large. Maximum size is 10MB per image.`
         );
-        return;
-      }
-
-      if (files.length > 5) {
-        toast.error("You can upload maximum 5 images per product.");
         return;
       }
     }
 
+    // Create previews
+    const newPreviews: string[] = [];
+    newFiles.forEach((file) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        newPreviews.push(reader.result as string);
+        if (newPreviews.length === newFiles.length) {
+          setImagePreviews([...imagePreviews, ...newPreviews]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+
+    setSelectedFiles([...selectedFiles, ...newFiles]);
+    e.target.value = ""; // Reset input
+  };
+
+  // Remove selected file
+  const removeSelectedFile = (index: number) => {
+    const newFiles = selectedFiles.filter((_, i) => i !== index);
+    const newPreviews = imagePreviews.filter((_, i) => i !== index);
+    setSelectedFiles(newFiles);
+    setImagePreviews(newPreviews);
+  };
+
+  // Remove existing image
+  const removeExistingImage = (index: number) => {
+    const newExisting = existingImages.filter((_, i) => i !== index);
+    setExistingImages(newExisting);
+  };
+
+  const handleSubmit = (data: ProductFormValues) => {
+    console.log("🔍 Form data before processing:", data);
+
     const formData = new FormData();
 
+    // Add form fields
     Object.entries(data).forEach(([key, value]) => {
-      if (key === "images" && value instanceof FileList) {
-        console.log(`📁 Adding ${value.length} images`);
-        Array.from(value).forEach((file, index) => {
-          // Ensure we use 'images[index]' format exactly
-          formData.append(`images[${index}]`, file);
-        });
-      } else if (value !== undefined && value !== null && value !== "") {
-        console.log(`📝 Adding ${key}:`, value);
+      if (value !== undefined && value !== null && value !== "") {
         formData.append(key, String(value));
       }
     });
+
+    // Add new images
+    selectedFiles.forEach((file, index) => {
+      formData.append(`images[${index}]`, file);
+    });
+
+    // For edit mode, send info about existing images to keep
+    if (mode === "edit" && existingImages.length > 0) {
+      formData.append("existing_images", JSON.stringify(existingImages));
+    }
 
     // Add default values if missing
     if (!formData.has("status")) {
@@ -168,7 +248,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       formData.append("stock_quantity", "0");
     }
 
-    // Debug FormData contents
     console.log("📦 FormData contents:");
     for (const [key, value] of formData.entries()) {
       console.log(
@@ -182,9 +261,17 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     } else {
       onSubmit(formData);
     }
+
+    // Reset after submit
+    setSelectedFiles([]);
+    setImagePreviews([]);
+    setExistingImages([]);
     onOpenChange(false);
     form.reset();
   };
+
+  const totalImages = selectedFiles.length + existingImages.length;
+  const canAddMore = totalImages < 5;
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -300,8 +387,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                   </SelectTrigger>
                   <SelectContent>
                     {categories.length === 0 ? (
-                      // non-empty value required by Radix; disabled so it can't be selected
                       <SelectItem
+                        key="__no_categories" // Add key
                         value="__no_categories"
                         disabled
                         className="text-sm text-muted-foreground"
@@ -309,11 +396,13 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                         No categories available. Please create a category first.
                       </SelectItem>
                     ) : (
-                      // use the category _id as the value so the backend receives the id
                       categories
                         .filter((cat) => cat.status === "active")
                         .map((category) => (
-                          <SelectItem key={category._id} value={category.name}>
+                          <SelectItem
+                            key={category._id} // This is correct
+                            value={category.name}
+                          >
                             {category.name}
                           </SelectItem>
                         ))
@@ -352,21 +441,84 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             </div>
           </div>
 
-          {/* Media */}
+          {/* Media - Improved Multiple Image Upload */}
           <div className="space-y-4">
             <h4 className="font-semibold">Media</h4>
+
+            {/* Existing Images (Edit Mode) */}
+            {mode === "edit" && existingImages.length > 0 && (
+              <div className="space-y-2">
+                <Label>Current Images ({existingImages.length})</Label>
+                <div className="grid grid-cols-5 gap-2">
+                  {existingImages.map((image, index) => (
+                    <div key={index} className="relative group">
+                      <img
+                        src={image.url}
+                        alt={`Current ${index + 1}`}
+                        className="w-full h-20 object-cover rounded border"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => removeExistingImage(index)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* New Image Previews */}
+            {imagePreviews.length > 0 && (
+              <div className="space-y-2">
+                <Label>New Images ({imagePreviews.length})</Label>
+                <div className="grid grid-cols-5 gap-2">
+                  {imagePreviews.map((preview, index) => (
+                    <div key={index} className="relative group">
+                      <img
+                        src={preview}
+                        alt={`Preview ${index + 1}`}
+                        className="w-full h-20 object-cover rounded border"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => removeSelectedFile(index)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* File Input */}
             <div className="space-y-2">
-              <Label htmlFor="images">Product Images</Label>
-              <input
+              <Label htmlFor="images">
+                Add Product Images ({totalImages}/5)
+              </Label>
+              <Input
                 id="images"
                 type="file"
                 multiple
                 accept="image/*"
-                {...form.register("images")}
+                onChange={handleFileChange}
+                disabled={!canAddMore}
+                className="cursor-pointer"
               />
               <p className="text-xs text-muted-foreground">
-                ✅ UPDATED: You can upload up to 5 images (jpeg, png, jpg, gif,
-                webp). Maximum 10MB per image, 50MB total.
+                {canAddMore
+                  ? `You can upload ${
+                      5 - totalImages
+                    } more image(s). Each image max 10MB.`
+                  : "Maximum 5 images reached. Remove an image to add more."}
               </p>
             </div>
           </div>
@@ -397,7 +549,12 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             <Button
               type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={() => {
+                setSelectedFiles([]);
+                setImagePreviews([]);
+                setExistingImages([]);
+                onOpenChange(false);
+              }}
             >
               Cancel
             </Button>
@@ -439,6 +596,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       ? product.images[0].url
       : product.image_url || "/placeholder.svg";
 
+  // ✅ FIX: Get the correct ID
+  const productId = product._id || product.id;
+
   const getStockStatusColor = (quantity: number) => {
     if (quantity <= 0) return "bg-red-500";
     if (quantity <= 5) return "bg-orange-500";
@@ -452,6 +612,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     if (quantity <= 10) return "Low Stock";
     return "In Stock";
   };
+
+  // ✅ Add debug logging
+  console.log(
+    "🔍 ProductCard - Product ID:",
+    productId,
+    "Full product:",
+    product
+  );
 
   return (
     <Card className="hover:shadow-lg transition-shadow">
@@ -548,7 +716,18 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => onDelete(product._id)}
+                onClick={() => {
+                  console.log(
+                    "🗑️ Delete button clicked, Product ID:",
+                    productId
+                  );
+                  if (!productId) {
+                    console.error("❌ Product ID is undefined!", product);
+                    alert("Error: Product ID is missing!");
+                    return;
+                  }
+                  onDelete(productId);
+                }}
                 className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
               >
                 <Trash2 className="h-4 w-4" />

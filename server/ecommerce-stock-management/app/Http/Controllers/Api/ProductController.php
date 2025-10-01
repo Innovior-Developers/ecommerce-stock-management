@@ -108,37 +108,35 @@ class ProductController extends Controller
 
     public function index(Request $request)
     {
-        $cacheKey = 'products_' . md5(serialize($request->all()));
-
-        $products = Cache::remember($cacheKey, 600, function () use ($request) {
+        try {
             $query = Product::query();
 
-            // Search filter
-            if ($search = $request->get('search')) {
-                $query->where(function ($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
-                        ->orWhere('description', 'like', "%{$search}%")
-                        ->orWhere('sku', 'like', "%{$search}%");
-                });
+            if ($request->has('search')) {
+                $search = $request->get('search');
+                $query->where('name', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%");
             }
 
-            // Category filter
-            if ($category = $request->get('category')) {
-                $query->where('category', $category);
-            }
+            $products = $query->get();
 
-            // Status filter
-            if ($status = $request->get('status')) {
-                $query->where('status', $status);
-            }
+            // ✅ Ensure _id is set
+            $products = $products->map(function ($product) {
+                if (!isset($product->_id) && isset($product->id)) {
+                    $product->_id = $product->id;
+                }
+                return $product;
+            });
 
-            return $query->latest()->paginate($request->get('per_page', 20));
-        });
-
-        return response()->json([
-            'success' => true,
-            'data' => $products,
-        ]);
+            return response()->json([
+                'success' => true,
+                'data' => $products
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 
     public function show($id)
@@ -165,6 +163,7 @@ class ProductController extends Controller
             'weight' => 'nullable|numeric|min:0',
             'meta_title' => 'nullable|string|max:255',
             'meta_description' => 'nullable|string',
+            'existing_images' => 'nullable|json', // Accept existing images data
         ]);
 
         if ($validator->fails()) {
@@ -172,6 +171,18 @@ class ProductController extends Controller
         }
 
         $validatedData = $validator->validated();
+
+        // Handle existing images
+        if ($request->has('existing_images')) {
+            $existingImages = json_decode($request->input('existing_images'), true);
+            $product->images = $existingImages;
+        } else {
+            // If no existing_images sent, keep current images
+            $existingImages = $product->images ?? [];
+        }
+
+        // Update text fields
+        unset($validatedData['existing_images']); // Remove from update data
         $product->fill($validatedData);
 
         // Handle new images
@@ -181,8 +192,8 @@ class ProductController extends Controller
                 $files = [$files];
             }
 
-            $existingImages = $product->images ?? [];
-            $newImages = $product->uploadMultipleImages($files, $existingImages);
+            $currentImages = $product->images ?? [];
+            $newImages = $product->uploadMultipleImages($files, $currentImages);
             $product->images = $newImages;
         }
 

@@ -1,5 +1,5 @@
 import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
+import { ToastWrapper } from "@/components/ui/toast-wrapper";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Provider } from "react-redux";
 import { store } from "@/store";
@@ -108,6 +108,10 @@ const router = createBrowserRouter(
     future: {
       v7_startTransition: true,
       v7_relativeSplatPath: true,
+      v7_fetcherPersist: true,
+      v7_normalizeFormMethod: true,
+      v7_partialHydration: true,
+      v7_skipActionErrorRevalidation: true,
     },
   }
 );
@@ -116,7 +120,7 @@ const App = () => (
   <Provider store={store}>
     <TooltipProvider>
       <Toaster />
-      <Sonner />
+      <ToastWrapper /> {/* Use enhanced toast */}
       <RouterProvider router={router} />
     </TooltipProvider>
   </Provider>

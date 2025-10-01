@@ -1,12 +1,10 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
-// Define the User type for consistency
 interface User {
   id: string;
-  name: string;
   email: string;
-  role: "admin" | "customer";
-  status: string;
+  name: string;
+  role: string;
   avatar?: string;
 }
 
@@ -16,40 +14,53 @@ interface AuthState {
   isAuthenticated: boolean;
 }
 
-// Function to load the initial state from localStorage
-const getInitialState = (): AuthState => {
-  const token = localStorage.getItem("jwt_token");
-  return {
-    user: null,
-    token: token,
-    isAuthenticated: false,
-  };
+const initialState: AuthState = {
+  user: null,
+  token: null,
+  isAuthenticated: false,
 };
 
 const authSlice = createSlice({
   name: "auth",
-  initialState: getInitialState(),
+  initialState,
   reducers: {
-    // This action is called on successful login or token refresh
     setCredentials: (
       state,
       action: PayloadAction<{ user: User; token: string }>
     ) => {
-      const { user, token } = action.payload;
-      state.user = user;
-      state.token = token;
+      state.user = action.payload.user;
+      state.token = action.payload.token;
       state.isAuthenticated = true;
-      localStorage.setItem("jwt_token", token);
+
+      // Also save to localStorage for persistence
+      localStorage.setItem("auth_token", action.payload.token);
+      localStorage.setItem("user", JSON.stringify(action.payload.user));
     },
-    // This action is called on logout
     clearCredentials: (state) => {
       state.user = null;
       state.token = null;
       state.isAuthenticated = false;
-      localStorage.removeItem("jwt_token");
+
+      // Clear localStorage
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("user");
+      localStorage.removeItem("refresh_token");
+      localStorage.removeItem("token_expiry");
+    },
+    // Keep logout as alias for backward compatibility
+    logout: (state) => {
+      state.user = null;
+      state.token = null;
+      state.isAuthenticated = false;
+
+      // Clear localStorage
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("user");
+      localStorage.removeItem("refresh_token");
+      localStorage.removeItem("token_expiry");
     },
   },
 });
 
-export const { setCredentials, clearCredentials } = authSlice.actions;
+export const { setCredentials, clearCredentials, logout } = authSlice.actions;
 export default authSlice.reducer;

@@ -10,8 +10,9 @@ import {
   useDeleteCategoryMutation,
   useGetCustomersQuery,
   useGetOrdersQuery,
-  useGetLowStockQuery,
+  useUpdateOrderMutation,
   useGetStockLevelsQuery,
+  useGetLowStockQuery,
   useUpdateStockMutation,
 } from "@/store/api/adminApi";
 import { useAppSelector } from "@/store/hooks";
@@ -122,15 +123,19 @@ const AdminDashboard = () => {
   const [deleteCategory] = useDeleteCategoryMutation();
   const [updateStock] = useUpdateStockMutation();
 
-  // Extract data with proper fallbacks
+  // ✅ FIX: Extract data with proper fallbacks
   const products = productsResponse?.data?.data || productsResponse?.data || [];
   const categories =
     categoriesResponse?.data?.data || categoriesResponse?.data || [];
   const customers =
-    customersResponse?.data?.data || customersResponse?.data || [];
+    customersResponse?.data?.data || customersResponse?.data || []; // ✅ ADD THIS LINE
   const orders = ordersResponse?.data?.data || ordersResponse?.data || [];
   const lowStockProducts = lowStockResponse?.data || [];
-  const stockLevels = stockLevelsResponse?.data || [];
+
+  // ✅ Add debug logging
+  console.log("📦 Products Response:", productsResponse);
+  console.log("📦 Extracted Products:", products);
+  console.log("📦 First Product:", products[0]);
 
   // Debug categories in console
   console.log("🏷️ Categories for Product Form:", {
@@ -140,34 +145,60 @@ const AdminDashboard = () => {
     categoriesError,
   });
 
+  // ✅ ADD: Debug customers
+  console.log("👥 Customers Response:", customersResponse);
+  console.log("👥 Extracted Customers:", customers);
+
   // Handle mutations
   const handleCreateProduct = async (data: unknown) => {
     try {
-      await createProduct(data).unwrap();
-      setIsAddProductOpen(false);
+      const result = await createProduct(data).unwrap();
+      console.log("✅ Product created:", result);
       toast.success("Product created successfully!");
+      setIsAddProductOpen(false);
     } catch (error: unknown) {
-      toast.error(error.data?.message || "Failed to create product");
+      console.error("❌ Create error:", error);
+      const errorMessage =
+        error?.data?.message || error?.message || "Failed to create product";
+      toast.error(errorMessage);
     }
   };
 
   const handleUpdateProduct = async (id: string, data: unknown) => {
     try {
-      await updateProduct({ id, data }).unwrap();
+      const result = await updateProduct({ id, data }).unwrap();
+      console.log("✅ Product updated:", result);
+      toast.success("Product updated successfully!");
       setIsEditProductOpen(false);
       setSelectedProduct(null);
-      toast.success("Product updated successfully!");
     } catch (error: unknown) {
-      toast.error(error.data?.message || "Failed to update product");
+      console.error("❌ Update error:", error);
+      const errorMessage =
+        error?.data?.message || error?.message || "Failed to update product";
+      toast.error(errorMessage);
     }
   };
 
+  // Update the handleDeleteProduct with confirmation
   const handleDeleteProduct = async (id: string) => {
+    if (
+      !window.confirm(
+        "Are you sure you want to delete this product? This action cannot be undone."
+      )
+    ) {
+      return;
+    }
+
     try {
-      await deleteProduct(id).unwrap();
+      console.log("🗑️ Deleting product with ID:", id);
+      const result = await deleteProduct(id).unwrap();
+      console.log("✅ Delete successful:", result);
       toast.success("Product deleted successfully!");
     } catch (error: unknown) {
-      toast.error(error.data?.message || "Failed to delete product");
+      console.error("❌ Delete error:", error);
+      const errorMessage =
+        error?.data?.message || error?.message || "Failed to delete product";
+      toast.error(errorMessage);
     }
   };
 
@@ -210,19 +241,21 @@ const AdminDashboard = () => {
     }
   };
 
-  // Filter data
+  // ✅ FIX: Filter data with proper null checks
   const filteredProducts = products.filter(
     (product: unknown) =>
-      product.name?.toLowerCase().includes(productSearch.toLowerCase()) ||
-      product.description?.toLowerCase().includes(productSearch.toLowerCase())
+      product?.name?.toLowerCase().includes(productSearch.toLowerCase()) ||
+      product?.description?.toLowerCase().includes(productSearch.toLowerCase())
   );
 
   const filteredCustomers = customers.filter(
     (customer: unknown) =>
-      customer.user?.name
+      customer?.user?.name
         ?.toLowerCase()
         .includes(customerSearch.toLowerCase()) ||
-      customer.user?.email?.toLowerCase().includes(customerSearch.toLowerCase())
+      customer?.user?.email
+        ?.toLowerCase()
+        .includes(customerSearch.toLowerCase())
   );
 
   // Calculate dashboard stats
@@ -305,7 +338,7 @@ const AdminDashboard = () => {
     <div className="min-h-screen bg-muted/30">
       <Header isAdmin={true} />
 
-      {/* Header */}
+      {/* Header - REMOVE THE ADD PRODUCT BUTTON HERE */}
       <header className="bg-background border-b">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -315,15 +348,7 @@ const AdminDashboard = () => {
                 Welcome back, {user?.name || "Admin"}! Here's what's happening.
               </p>
             </div>
-            <div className="flex items-center space-x-4">
-              <Button
-                onClick={() => setIsAddProductOpen(true)}
-                className="flex items-center space-x-2"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Add Product</span>
-              </Button>
-            </div>
+            {/* REMOVE THIS BUTTON - Keep only in Products tab */}
           </div>
         </div>
       </header>
@@ -513,14 +538,14 @@ const AdminDashboard = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredProducts.map((product: unknown) => (
                       <ProductCard
-                        key={product._id}
+                        key={product._id || product.id} // ✅ FIX: Add fallback
                         product={product}
                         onEdit={(product) => {
                           setSelectedProduct(product);
                           setIsEditProductOpen(true);
                         }}
                         onDelete={(id) => handleDeleteProduct(id)}
-                        onView={handleViewProduct} // Add this line
+                        onView={handleViewProduct}
                       />
                     ))}
                   </div>
@@ -562,7 +587,7 @@ const AdminDashboard = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {categories.map((category: Category) => (
                       <CategoryCard
-                        key={category._id} // ✅ FIX: Add the unique key
+                        key={category._id} // ✅ Already has key, but verify it's here
                         category={category}
                         onEdit={(category) => {
                           setSelectedCategory(category);
@@ -606,7 +631,7 @@ const AdminDashboard = () => {
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {products.map((product: unknown) => (
                       <InventoryUpdateForm
-                        key={product._id}
+                        key={product._id || product.id} // ✅ FIX: Add fallback
                         product={product}
                         onStockUpdate={handleStockUpdate}
                         isUpdating={false}
@@ -668,7 +693,9 @@ const AdminDashboard = () => {
                     </TableHeader>
                     <TableBody>
                       {orders.slice(0, 10).map((order: unknown) => (
-                        <TableRow key={order._id}>
+                        <TableRow key={order._id || order.id}>
+                          {" "}
+                          {/* ✅ FIX: Add fallback */}{" "}
                           <TableCell className="font-mono">
                             #{order._id?.slice(-6)}
                           </TableCell>
@@ -769,7 +796,9 @@ const AdminDashboard = () => {
                     </TableHeader>
                     <TableBody>
                       {filteredCustomers.map((customer: unknown) => (
-                        <TableRow key={customer._id}>
+                        <TableRow key={customer._id || customer.id}>
+                          {" "}
+                          {/* ✅ Already fixed */}{" "}
                           <TableCell>
                             <div className="flex items-center gap-3">
                               <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">

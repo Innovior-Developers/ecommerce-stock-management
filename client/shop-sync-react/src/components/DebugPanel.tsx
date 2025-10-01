@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useAppSelector } from "@/store/hooks";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { testBackendConnection } from "@/api/test";
 
 export const DebugPanel = () => {
+  const auth = useAppSelector((state) => state.auth);
   const [debugInfo, setDebugInfo] = useState<unknown>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -19,21 +20,15 @@ export const DebugPanel = () => {
     }
   };
 
-  return (
-    <Card className="mb-6">
-      <CardHeader>
-        <CardTitle>Debug Panel</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <Button onClick={runTests} disabled={isLoading}>
-          {isLoading ? "Testing..." : "Test Backend Connection"}
-        </Button>
+  if (process.env.NODE_ENV !== "development") return null;
 
-        {debugInfo && (
-          <pre className="mt-4 p-4 bg-gray-100 rounded text-xs overflow-auto">
-            {JSON.stringify(debugInfo, null, 2)}
-          </pre>
-        )}
+  return (
+    <Card className="fixed bottom-4 right-4 z-50 w-80 max-h-96 overflow-auto">
+      <CardHeader>
+        <CardTitle className="text-sm">Auth Debug</CardTitle>
+      </CardHeader>
+      <CardContent className="text-xs">
+        <pre>{JSON.stringify(auth, null, 2)}</pre>
       </CardContent>
     </Card>
   );

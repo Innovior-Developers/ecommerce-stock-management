@@ -60,6 +60,15 @@ export const adminApi = createApi({
         method: "DELETE",
       }),
       invalidatesTags: ["Product", "Inventory"],
+      async onQueryStarted(id, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          // Force refresh the products list
+          dispatch(adminApi.util.invalidateTags(["Product", "Inventory"]));
+        } catch {
+          /* empty */
+        }
+      },
     }),
 
     // Categories

@@ -142,6 +142,7 @@ export const authApi = createApi({
         } catch (error) {
           console.warn("Logout API call failed:", error);
         } finally {
+          // Always clear credentials locally, even if server call fails
           dispatch(clearCredentials());
         }
       },
