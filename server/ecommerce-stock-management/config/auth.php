@@ -13,7 +13,7 @@ return [
     */
 
     'defaults' => [
-        'guard' => 'api', // Change from 'web' to 'api'
+        'guard' => env('AUTH_GUARD', 'web'),
         'passwords' => 'users',
     ],
 
@@ -41,9 +41,9 @@ return [
         ],
 
         'api' => [
-            'driver' => 'jwt', // Use JWT driver
+            // JWT guard for API auth
+            'driver' => 'jwt',
             'provider' => 'users',
-            'hash' => false,
         ],
     ],
 
@@ -93,7 +93,7 @@ return [
     'passwords' => [
         'users' => [
             'provider' => 'users',
-            'table' => 'password_reset_tokens',
+            'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
             'expire' => 60,
             'throttle' => 60,
         ],

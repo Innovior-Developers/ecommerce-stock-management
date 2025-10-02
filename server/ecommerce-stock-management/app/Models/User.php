@@ -2,15 +2,15 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Notifications\Notifiable;
-use Tymon\JWTAuth\Contracts\JWTSubject;
 use MongoDB\Laravel\Auth\User as Authenticatable;
-use Illuminate\Support\Str;
+use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Tymon\JWTAuth\Contracts\JWTSubject;
+use Carbon\Carbon;
 
 class User extends Authenticatable implements JWTSubject
 {
-    use HasFactory, Notifiable;
+    use Notifiable, HasFactory;
 
     protected $connection = 'mongodb';
     protected $collection = 'users';
@@ -21,98 +21,60 @@ class User extends Authenticatable implements JWTSubject
         'password',
         'role',
         'status',
-        'avatar',
+        'email_verified_at',
         'provider',
         'provider_id',
-        'email_verified_at',
-        'public_id',
+        'avatar',
     ];
 
     protected $hidden = [
         'password',
         'remember_token',
-        '_id', // ✅ Hide MongoDB _id from API responses
-        'provider_id',
     ];
-
-    // ✅ REMOVE $appends - we'll handle serialization differently
-    // protected $appends = ['id'];
 
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
     ];
 
-    protected static function boot()
-    {
-        parent::boot();
-
-        static::creating(function ($user) {
-            if (!$user->public_id) {
-                $user->public_id = 'usr_' . Str::random(20);
-            }
-        });
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    // JWT METHODS - USE _id (MongoDB's native ID)
-    // ═══════════════════════════════════════════════════════════
+    protected $dates = [
+        'email_verified_at',
+    ];
 
     /**
-     * ✅ CRITICAL: Return MongoDB _id for JWT authentication
+     * Get the identifier that will be stored in the subject claim of the JWT.
      */
     public function getJWTIdentifier()
     {
-        return (string) $this->_id;
+        return $this->getKey();
     }
 
+    /**
+     * Return a key value array, containing any custom claims to be added to the JWT.
+     */
     public function getJWTCustomClaims()
     {
         return [
             'role' => $this->role,
-            'name' => $this->name,
             'status' => $this->status,
-            'public_id' => $this->public_id,
+            'email' => $this->email,
+            'name' => $this->name,
         ];
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    // LARAVEL AUTH METHODS - USE _id
-    // ═══════════════════════════════════════════════════════════
-
-    public function getAuthIdentifier()
-    {
-        return (string) $this->_id;
-    }
-
-    public function getAuthIdentifierName()
-    {
-        return '_id';
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    // API SERIALIZATION - Override toArray() instead
-    // ═══════════════════════════════════════════════════════════
-
-    /**
-     * ✅ Override toArray to replace _id with public_id as 'id'
-     */
-    public function toArray()
-    {
-        $array = parent::toArray();
-
-        // Remove _id from array (already hidden, but double-check)
-        unset($array['_id']);
-
-        // Add public_id as 'id'
-        $array['id'] = $this->public_id;
-
-        return $array;
     }
 
     // Relationships
     public function customer()
     {
         return $this->hasOne(Customer::class, 'user_id', '_id');
+    }
+
+    /**
+     * Set the email verified at timestamp
+     */
+    public function setEmailVerifiedAtAttribute($value)
+    {
+        $this->attributes['email_verified_at'] = $value instanceof Carbon
+            ? $value
+            : Carbon::parse($value);
     }
 }

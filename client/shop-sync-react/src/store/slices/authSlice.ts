@@ -32,28 +32,28 @@ const authSlice = createSlice({
       state.token = action.payload.token;
       state.isAuthenticated = true;
 
-      // ✅ ONLY store token, NOT user data
+      // Also save to localStorage for persistence
       localStorage.setItem("auth_token", action.payload.token);
-
-      // ❌ REMOVE these lines:
-      // localStorage.setItem("user", JSON.stringify(action.payload.user));
+      localStorage.setItem("user", JSON.stringify(action.payload.user));
     },
     clearCredentials: (state) => {
       state.user = null;
       state.token = null;
       state.isAuthenticated = false;
 
-      // Clear all auth data
+      // Clear localStorage
       localStorage.removeItem("auth_token");
-      localStorage.removeItem("user"); // Clean up old data
+      localStorage.removeItem("user");
       localStorage.removeItem("refresh_token");
       localStorage.removeItem("token_expiry");
     },
+    // Keep logout as alias for backward compatibility
     logout: (state) => {
       state.user = null;
       state.token = null;
       state.isAuthenticated = false;
 
+      // Clear localStorage
       localStorage.removeItem("auth_token");
       localStorage.removeItem("user");
       localStorage.removeItem("refresh_token");

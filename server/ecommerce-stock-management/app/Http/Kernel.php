@@ -39,7 +39,7 @@ class Kernel extends HttpKernel
         ],
 
         'api' => [
-            \App\Http\Middleware\SecurityHeaders::class, // ✅ Add security headers
+            // \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class, // Remove this
             \Illuminate\Routing\Middleware\ThrottleRequests::class . ':api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ],
@@ -67,9 +67,5 @@ class Kernel extends HttpKernel
         // JWT Middleware
         'jwt.auth' => \App\Http\Middleware\JWTMiddleware::class,
         'admin' => \App\Http\Middleware\AdminMiddleware::class,
-        'audit' => \App\Http\Middleware\AuditAdminActions::class,
-        'validate.token' => \App\Http\Middleware\ValidateApiToken::class,
-        'security.headers' => \App\Http\Middleware\SecurityHeaders::class,
-        // ... other middleware
     ];
 }
