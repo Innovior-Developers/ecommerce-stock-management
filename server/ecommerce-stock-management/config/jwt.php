@@ -98,7 +98,7 @@ return [
     |
     */
 
-    'ttl' => (int) env('JWT_TTL', 1440), // Cast to integer - 24 hours in minutes
+    'ttl' => env('JWT_TTL', 1440), // 24 hours
 
     /*
     |--------------------------------------------------------------------------
@@ -117,7 +117,7 @@ return [
     |
     */
 
-    'refresh_ttl' => (int) env('JWT_REFRESH_TTL', 20160), // Cast to integer - 14 days in minutes
+    'refresh_ttl' => env('JWT_REFRESH_TTL', 20160), // 2 weeks
 
     /*
     |--------------------------------------------------------------------------
@@ -146,7 +146,7 @@ return [
         'iat',
         'exp',
         'nbf',
-        'sub',
+        'sub', // ✅ CRITICAL: This will contain _id (NOT public_id)
         'jti',
     ],
 
@@ -163,10 +163,7 @@ return [
     |
     */
 
-    'persistent_claims' => [
-        // 'foo',
-        // 'bar',
-    ],
+    'persistent_claims' => [],
 
     /*
     |--------------------------------------------------------------------------
@@ -202,7 +199,7 @@ return [
     |
     */
 
-    'leeway' => (int) env('JWT_LEEWAY', 0),
+    'leeway' => env('JWT_LEEWAY', 0),
 
     /*
     |--------------------------------------------------------------------------
@@ -214,7 +211,7 @@ return [
     |
     */
 
-    'blacklist_enabled' => filter_var(env('JWT_BLACKLIST_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
+    'blacklist_enabled' => env('JWT_BLACKLIST_ENABLED', true),
 
     /*
     | -------------------------------------------------------------------------
@@ -229,7 +226,9 @@ return [
     |
     */
 
-    'blacklist_grace_period' => (int) env('JWT_BLACKLIST_GRACE_PERIOD', 0),
+    'blacklist_grace_period' => env('JWT_BLACKLIST_GRACE_PERIOD', 0),
+
+    'decrypt_cookies' => false,
 
     /*
     |--------------------------------------------------------------------------

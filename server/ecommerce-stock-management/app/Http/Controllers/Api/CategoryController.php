@@ -4,11 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Category;
+use App\Http\Resources\CategoryResource;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Cache;
 
 class CategoryController extends Controller
 {
@@ -20,44 +21,25 @@ class CategoryController extends Controller
             $query = Category::query();
 
             if ($search) {
-                $query->where('name', 'like', "%{$search}%")
-                    ->orWhere('description', 'like', "%{$search}%");
+                $query->where('name', 'regex', "/$search/i")
+                    ->orWhere('description', 'regex', "/$search/i");
             }
 
-            // Get all categories with their product counts
             $categories = $query->latest()->get()->map(function ($category) {
-                // Count products in this category
-                $productCount = \App\Models\Product::where('category', $category->name)->count();
-
-                return [
-                    '_id' => $category->_id,
-                    'name' => $category->name,
-                    'description' => $category->description,
-                    'slug' => $category->slug,
-                    'status' => $category->status,
-                    'sort_order' => $category->sort_order,
-                    'parent_id' => $category->parent_id,
-                    'image_url' => $category->image_url,
-                    'meta_title' => $category->meta_title,
-                    'meta_description' => $category->meta_description,
-                    'created_at' => $category->created_at,
-                    'updated_at' => $category->updated_at,
-                    'products_count' => $productCount,
-                ];
+                $category->products_count = \App\Models\Product::where('category', $category->name)->count();
+                return $category;
             });
 
-            Log::info('Categories fetched successfully', ['count' => $categories->count()]);
-
-            return response()->json([
-                'success' => true,
-                'data' => $categories,
-                'message' => 'Categories retrieved successfully'
-            ]);
+            return CategoryResource::collection($categories)
+                ->additional([
+                    'success' => true,
+                    'message' => 'Categories retrieved successfully'
+                ]);
         } catch (\Exception $e) {
             Log::error('Error fetching categories: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to fetch categories: ' . $e->getMessage()
+                'message' => 'Failed to fetch categories'
             ], 500);
         }
     }
@@ -131,24 +113,44 @@ class CategoryController extends Controller
     public function show($id)
     {
         try {
-            $category = Category::findOrFail($id);
+            $category = $this->findByHashedId($id);
 
-            // Get product count
-            $productCount = \App\Models\Product::where('category', $category->name)->count();
+            if (!$category) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Category not found'
+                ], 404);
+            }
 
-            $categoryData = $category->toArray();
-            $categoryData['products_count'] = $productCount;
+            $category->products_count = \App\Models\Product::where('category', $category->name)->count();
 
-            return response()->json([
-                'success' => true,
-                'data' => $categoryData,
-            ]);
+            return (new CategoryResource($category))
+                ->additional([
+                    'success' => true,
+                    'message' => 'Category retrieved successfully'
+                ]);
         } catch (\Exception $e) {
+            Log::error('Error fetching category: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Category not found'
-            ], 404);
+                'message' => 'Failed to fetch category'
+            ], 500);
         }
+    }
+
+    private function findByHashedId($hashedId)
+    {
+        $hash = str_replace('cat_', '', $hashedId);
+
+        $categories = Category::all();
+        foreach ($categories as $category) {
+            $categoryHash = substr(hash('sha256', (string)$category->_id), 0, 16);
+            if ($categoryHash === $hash) {
+                return $category;
+            }
+        }
+
+        return null;
     }
 
     public function update(Request $request, $id)

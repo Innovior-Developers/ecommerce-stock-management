@@ -5,9 +5,10 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Tymon\JWTAuth\Facades\JWTAuth;
-use Tymon\JWTAuth\Exceptions\JWTException;
 use Tymon\JWTAuth\Exceptions\TokenExpiredException;
 use Tymon\JWTAuth\Exceptions\TokenInvalidException;
+use Tymon\JWTAuth\Exceptions\JWTException;
+use Illuminate\Support\Facades\Log;
 
 class JWTMiddleware
 {
@@ -17,13 +18,23 @@ class JWTMiddleware
     public function handle(Request $request, Closure $next)
     {
         try {
+            // ✅ This will now correctly find user by _id from JWT
             $user = JWTAuth::parseToken()->authenticate();
 
             if (!$user) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'User not found'
+                    'message' => 'User not found',
+                    'error_code' => 'USER_NOT_FOUND'
                 ], 404);
+            }
+
+            if ($user->status !== 'active') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Account is not active',
+                    'error_code' => 'ACCOUNT_INACTIVE'
+                ], 403);
             }
         } catch (TokenExpiredException $e) {
             return response()->json([
@@ -40,7 +51,7 @@ class JWTMiddleware
         } catch (JWTException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Token is required',
+                'message' => 'Token is absent',
                 'error_code' => 'TOKEN_ABSENT'
             ], 401);
         }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Product;
+use App\Http\Resources\ProductResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -109,46 +110,83 @@ class ProductController extends Controller
     public function index(Request $request)
     {
         try {
+            $search = $request->get('search');
+            $category = $request->get('category');
+            $status = $request->get('status');
+
             $query = Product::query();
 
-            if ($request->has('search')) {
-                $search = $request->get('search');
-                $query->where('name', 'like', "%{$search}%")
-                    ->orWhere('description', 'like', "%{$search}%");
+            if ($search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'regex', "/$search/i")
+                        ->orWhere('description', 'regex', "/$search/i")
+                        ->orWhere('sku', 'regex', "/$search/i");
+                });
             }
 
-            $products = $query->get();
+            if ($category) {
+                $query->where('category', $category);
+            }
 
-            // ✅ Ensure _id is set
-            $products = $products->map(function ($product) {
-                if (!isset($product->_id) && isset($product->id)) {
-                    $product->_id = $product->id;
-                }
-                return $product;
-            });
+            if ($status) {
+                $query->where('status', $status);
+            }
 
-            return response()->json([
-                'success' => true,
-                'data' => $products
-            ]);
+            $products = $query->orderBy('created_at', 'desc')->paginate(20);
+
+            return ProductResource::collection($products)
+                ->additional([
+                    'success' => true,
+                    'message' => 'Products retrieved successfully'
+                ]);
         } catch (\Exception $e) {
+            Log::error('Error fetching products: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => 'Failed to fetch products'
             ], 500);
         }
     }
 
     public function show($id)
     {
-        $product = Cache::remember("product_{$id}", 600, function () use ($id) {
-            return Product::findOrFail($id);
-        });
+        try {
+            $product = $this->findByHashedId($id);
 
-        return response()->json([
-            'success' => true,
-            'data' => $product,
-        ]);
+            if (!$product) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Product not found'
+                ], 404);
+            }
+
+            return (new ProductResource($product))
+                ->additional([
+                    'success' => true,
+                    'message' => 'Product retrieved successfully'
+                ]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching product: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch product'
+            ], 500);
+        }
+    }
+
+    private function findByHashedId($hashedId)
+    {
+        $hash = str_replace('prod_', '', $hashedId);
+
+        $products = Product::all();
+        foreach ($products as $product) {
+            $productHash = substr(hash('sha256', (string)$product->_id), 0, 16);
+            if ($productHash === $hash) {
+                return $product;
+            }
+        }
+
+        return null;
     }
 
     public function update(Request $request, Product $product)

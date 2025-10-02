@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use MongoDB\Laravel\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class Category extends Model
 {
@@ -13,12 +14,17 @@ class Category extends Model
         'name',
         'description',
         'slug',
-        'status',
-        'sort_order',
         'parent_id',
         'image_url',
+        'status',
+        'sort_order',
         'meta_title',
         'meta_description',
+        'public_id',
+    ];
+
+    protected $hidden = [
+        '_id', // ✅ Hide MongoDB ID
     ];
 
     protected $casts = [
@@ -27,21 +33,37 @@ class Category extends Model
         'updated_at' => 'datetime',
     ];
 
-    // Relationship for subcategories
-    public function children()
+    // ✅ Generate public_id on creation
+    protected static function boot()
     {
-        return $this->hasMany(Category::class, 'parent_id');
+        parent::boot();
+
+        static::creating(function ($category) {
+            if (!$category->public_id) {
+                $category->public_id = 'cat_' . Str::random(20);
+            }
+
+            // Auto-generate slug if not provided
+            if (!$category->slug && $category->name) {
+                $category->slug = Str::slug($category->name);
+            }
+        });
     }
 
-    // Relationship for parent category
+    // ✅ Generate hashed public ID for frontend
+    public function getHashedIdAttribute()
+    {
+        return 'cat_' . substr(hash('sha256', (string)$this->_id), 0, 16);
+    }
+
+    // Relationships
     public function parent()
     {
-        return $this->belongsTo(Category::class, 'parent_id');
+        return $this->belongsTo(Category::class, 'parent_id', '_id');
     }
 
-    // Scope for active categories
-    public function scopeActive($query)
+    public function children()
     {
-        return $query->where('status', 'active');
+        return $this->hasMany(Category::class, 'parent_id', '_id');
     }
 }

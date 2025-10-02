@@ -4,47 +4,86 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
+use App\Http\Resources\CustomerResource;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 
 class CustomerController extends Controller
 {
     public function index(Request $request)
     {
-        $cacheKey = 'customers_' . md5(serialize($request->all()));
+        try {
+            $search = $request->get('search');
 
-        $customers = Cache::remember($cacheKey, 300, function () use ($request) {
             $query = Customer::with('user');
 
-            if ($request->has('search')) {
-                $search = $request->search;
+            if ($search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('first_name', 'regex', "/$search/i")
-                        ->orWhere('last_name', 'regex', "/$search/i");
-                })->orWhereHas('user', function ($q) use ($search) {
-                    $q->where('email', 'regex', "/$search/i");
+                        ->orWhere('last_name', 'regex', "/$search/i")
+                        ->orWhere('phone', 'regex', "/$search/i");
                 });
             }
 
-            return $query->orderBy('created_at', 'desc')->paginate(20);
-        });
+            $customers = $query->orderBy('created_at', 'desc')->paginate(20);
 
-        return response()->json([
-            'success' => true,
-            'data' => $customers,
-        ]);
+            return CustomerResource::collection($customers)
+                ->additional([
+                    'success' => true,
+                    'message' => 'Customers retrieved successfully'
+                ]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching customers: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch customers'
+            ], 500);
+        }
     }
 
     public function show($id)
     {
-        $customer = Cache::remember("customer_{$id}", 300, function () use ($id) {
-            return Customer::with(['user', 'orders'])->findOrFail($id);
-        });
+        try {
+            // Reverse hash to find customer by hashed ID
+            $customer = $this->findByHashedId($id);
 
-        return response()->json([
-            'success' => true,
-            'data' => $customer,
-        ]);
+            if (!$customer) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Customer not found'
+                ], 404);
+            }
+
+            return (new CustomerResource($customer->load('user')))
+                ->additional([
+                    'success' => true,
+                    'message' => 'Customer retrieved successfully'
+                ]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching customer: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch customer'
+            ], 500);
+        }
+    }
+
+    private function findByHashedId($hashedId)
+    {
+        // Remove prefix
+        $hash = str_replace('cus_', '', $hashedId);
+
+        // Search through customers to find matching hash
+        $customers = Customer::all();
+        foreach ($customers as $customer) {
+            $customerHash = substr(hash('sha256', (string)$customer->_id), 0, 16);
+            if ($customerHash === $hash) {
+                return $customer;
+            }
+        }
+
+        return null;
     }
 
     public function update(Request $request, $id)
@@ -64,7 +103,7 @@ class CustomerController extends Controller
 
         $customer->update($validated);
 
-        // Clear cache
+       // Clear cache
         Cache::forget("customer_{$id}");
         Cache::tags(['customers'])->flush();
 
@@ -135,3 +174,4 @@ class CustomerController extends Controller
         ]);
     }
 }
+ 

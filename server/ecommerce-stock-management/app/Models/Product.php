@@ -5,7 +5,7 @@ namespace App\Models;
 use MongoDB\Laravel\Eloquent\Model;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Log; // Add this import for Log facade
+use Illuminate\Support\Facades\Log;
 
 class Product extends Model
 {
@@ -25,6 +25,11 @@ class Product extends Model
         'dimensions',
         'meta_title',
         'meta_description',
+        'public_id', // ✅ Add this
+    ];
+
+    protected $hidden = [
+        '_id', // ✅ Hide MongoDB ID from responses
     ];
 
     protected $casts = [
@@ -37,12 +42,18 @@ class Product extends Model
         'updated_at' => 'datetime',
     ];
 
-    // Boot method to auto-generate SKU
+    // ✅ Boot method - Add public_id generation
     protected static function boot()
     {
         parent::boot();
 
         static::creating(function ($product) {
+            // Generate public_id for security
+            if (!$product->public_id) {
+                $product->public_id = 'prod_' . Str::random(20);
+            }
+
+            // Auto-generate SKU
             if (empty($product->sku)) {
                 $product->sku = $product->generateSku();
             }
@@ -57,6 +68,12 @@ class Product extends Model
         static::deleting(function ($product) {
             $product->deleteImages();
         });
+    }
+
+    // ✅ Generate hashed public ID for frontend (security)
+    public function getHashedIdAttribute()
+    {
+        return 'prod_' . substr(hash('sha256', (string)$this->_id), 0, 16);
     }
 
     // Generate SKU from product name and meta title
@@ -87,7 +104,7 @@ class Product extends Model
         return $sku;
     }
 
-    // Upload image to S3 - FIXED VERSION with proper URL generation
+    // Upload image to S3 - Your existing method (unchanged)
     public function uploadImage($file, $existingImages = [])
     {
         Log::info('uploadImage called', [
@@ -175,7 +192,7 @@ class Product extends Model
         }
     }
 
-    // Upload multiple images - IMPROVED VERSION
+    // Upload multiple images - Your existing method (unchanged)
     public function uploadMultipleImages($files, $existingImages = [])
     {
         $images = is_array($existingImages) ? $existingImages : [];
@@ -198,7 +215,7 @@ class Product extends Model
         return $images;
     }
 
-    // Delete images from S3 - IMPROVED VERSION
+    // Delete images from S3 - Your existing method (unchanged)
     public function deleteImages($imagesToDelete = null)
     {
         $images = $imagesToDelete ?? $this->images ?? [];
@@ -231,7 +248,7 @@ class Product extends Model
         }
     }
 
-    // Delete specific image - IMPROVED VERSION
+    // Delete specific image - Your existing method (unchanged)
     public function deleteImage($imageIndex)
     {
         $images = $this->images ?? [];
@@ -285,7 +302,7 @@ class Product extends Model
         return true;
     }
 
-    // Set primary image
+    // Set primary image - Your existing method (unchanged)
     public function setPrimaryImage($imageIndex)
     {
         $images = $this->images ?? [];
@@ -303,7 +320,7 @@ class Product extends Model
         return true;
     }
 
-    // Get primary image - IMPROVED VERSION
+    // Get primary image - Your existing method (unchanged)
     public function getPrimaryImageAttribute()
     {
         $images = $this->images ?? [];
@@ -323,20 +340,20 @@ class Product extends Model
         return $images[0]['url'] ?? null;
     }
 
-    // Get all image URLs
+    // Get all image URLs - Your existing method (unchanged)
     public function getImageUrlsAttribute()
     {
         $images = $this->images ?? [];
         return array_column($images, 'url');
     }
 
-    // Get image count
+    // Get image count - Your existing method (unchanged)
     public function getImageCountAttribute()
     {
         return count($this->images ?? []);
     }
 
-    // Check if product has images
+    // Check if product has images - Your existing method (unchanged)
     public function getHasImagesAttribute()
     {
         return !empty($this->images);
