@@ -63,6 +63,7 @@ import { InventoryUpdateForm } from "@/components/admin forms/Inventory.form";
 import { CategoriesDebug } from "@/components/CategoriesDebug";
 import { Category } from "../types"; // ✅ Import the new type
 import ProductDetail from "@/components/admin forms/ProductDetail";
+import CategoryDetail from "@/components/admin forms/CategoryDetail";
 
 const AdminDashboard = () => {
   // All hooks at the top level
@@ -79,6 +80,9 @@ const AdminDashboard = () => {
   // Add your new states here:
   const [isProductDetailOpen, setIsProductDetailOpen] = useState(false);
   const [selectedViewProduct, setSelectedViewProduct] = useState<unknown>(null);
+  const [isCategoryDetailOpen, setIsCategoryDetailOpen] = useState(false);
+  const [selectedViewCategory, setSelectedViewCategory] =
+    useState<Category | null>(null);
 
   // Get user from Redux state
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
@@ -202,33 +206,48 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleCreateCategory = async (data: unknown) => {
+  const handleCreateCategory = async (data: CategoryFormValues) => {
     try {
-      await createCategory(data).unwrap();
-      setIsAddCategoryOpen(false);
+      console.log("📝 Creating category:", data);
+      const result = await createCategory(data).unwrap();
+      console.log("✅ Category created:", result);
       toast.success("Category created successfully!");
+      setIsAddCategoryOpen(false);
     } catch (error: unknown) {
-      toast.error(error.data?.message || "Failed to create category");
+      console.error("❌ Create category error:", error);
+      const errorMessage =
+        error?.data?.message || error?.message || "Failed to create category";
+      toast.error(errorMessage);
     }
   };
 
-  const handleUpdateCategory = async (id: string, data: unknown) => {
+  const handleUpdateCategory = async (id: string, data: CategoryFormValues) => {
     try {
-      await updateCategory({ id, data }).unwrap();
+      console.log("📝 Updating category:", { id, data });
+      const result = await updateCategory({ id, data }).unwrap();
+      console.log("✅ Category updated:", result);
+      toast.success("Category updated successfully!");
       setIsEditCategoryOpen(false);
       setSelectedCategory(null);
-      toast.success("Category updated successfully!");
     } catch (error: unknown) {
-      toast.error(error.data?.message || "Failed to update category");
+      console.error("❌ Update category error:", error);
+      const errorMessage =
+        error?.data?.message || error?.message || "Failed to update category";
+      toast.error(errorMessage);
     }
   };
 
   const handleDeleteCategory = async (id: string) => {
     try {
-      await deleteCategory(id).unwrap();
+      console.log("🗑️ Deleting category:", id);
+      const result = await deleteCategory(id).unwrap();
+      console.log("✅ Category deleted:", result);
       toast.success("Category deleted successfully!");
     } catch (error: unknown) {
-      toast.error(error.data?.message || "Failed to delete category");
+      console.error("❌ Delete category error:", error);
+      const errorMessage =
+        error?.data?.message || error?.message || "Failed to delete category";
+      toast.error(errorMessage);
     }
   };
 
@@ -332,6 +351,12 @@ const AdminDashboard = () => {
   const handleViewProduct = (product: unknown) => {
     setSelectedViewProduct(product);
     setIsProductDetailOpen(true);
+  };
+
+  // Add handler for viewing category
+  const handleViewCategory = (category: Category) => {
+    setSelectedViewCategory(category);
+    setIsCategoryDetailOpen(true);
   };
 
   return (
@@ -439,7 +464,7 @@ const AdminDashboard = () => {
                           </div>
                         </div>
                       ))
-                    )}
+                   ) }
                   </div>
                 </CardContent>
               </Card>
@@ -459,22 +484,27 @@ const AdminDashboard = () => {
                         All products are well stocked!
                       </div>
                     ) : (
-                      lowStockProducts.slice(0, 5).map((product: unknown) => (
-                        <div
-                          key={product._id}
-                          className="flex items-center justify-between p-3 border border-orange-200 rounded-lg bg-orange-50"
-                        >
-                          <div>
-                            <p className="font-medium">{product.name}</p>
-                            <p className="text-sm text-muted-foreground">
-                              Stock: {product.stock_quantity}
-                            </p>
+                      lowStockProducts
+                        .slice(0, 5)
+                        .map((product: unknown, idx: number) => (
+                          <div
+                            key={product._id || product.id || `lowstock-${idx}`}
+                            className="flex items-center justify-between p-3 border border-orange-200 rounded-lg bg-orange-50"
+                          >
+                            <div>
+                              <p className="font-medium">{product.name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                Stock: {product.stock_quantity}
+                              </p>
+                            </div>
+                            <Badge
+                              variant="outline"
+                              className="text-orange-600"
+                            >
+                              Low Stock
+                            </Badge>
                           </div>
-                          <Badge variant="outline" className="text-orange-600">
-                            Low Stock
-                          </Badge>
-                        </div>
-                      ))
+                        ))
                     )}
                   </div>
                 </CardContent>
@@ -587,16 +617,14 @@ const AdminDashboard = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {categories.map((category: Category) => (
                       <CategoryCard
-                        key={category._id} // ✅ Already has key, but verify it's here
+                        key={category._id}
                         category={category}
                         onEdit={(category) => {
                           setSelectedCategory(category);
                           setIsEditCategoryOpen(true);
                         }}
                         onDelete={(id) => handleDeleteCategory(id)}
-                        onView={() => {
-                          /* Optional: Implement view logic */
-                        }}
+                        onView={handleViewCategory} // ✅ FIX: Use the new handler
                       />
                     ))}
                   </div>
@@ -694,8 +722,6 @@ const AdminDashboard = () => {
                     <TableBody>
                       {orders.slice(0, 10).map((order: unknown) => (
                         <TableRow key={order._id || order.id}>
-                          {" "}
-                          {/* ✅ FIX: Add fallback */}{" "}
                           <TableCell className="font-mono">
                             #{order._id?.slice(-6)}
                           </TableCell>
@@ -797,8 +823,6 @@ const AdminDashboard = () => {
                     <TableBody>
                       {filteredCustomers.map((customer: unknown) => (
                         <TableRow key={customer._id || customer.id}>
-                          {" "}
-                          {/* ✅ Already fixed */}{" "}
                           <TableCell>
                             <div className="flex items-center gap-3">
                               <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
@@ -926,6 +950,14 @@ const AdminDashboard = () => {
         product={selectedViewProduct}
         isOpen={isProductDetailOpen}
         onOpenChange={setIsProductDetailOpen}
+      />
+
+      {/* ✅ ADD: CategoryDetail Modal */}
+      <CategoryDetail
+        category={selectedViewCategory}
+        categories={categories}
+        isOpen={isCategoryDetailOpen}
+        onOpenChange={setIsCategoryDetailOpen}
       />
     </div>
   );

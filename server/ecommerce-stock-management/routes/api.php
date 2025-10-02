@@ -347,3 +347,14 @@ Route::post('/test-image-upload', function (Request $request) {
 
     return response()->json($result);
 });
+
+// Make sure these routes are in your api.php file
+Route::prefix('admin')->middleware(['jwt.auth', 'admin'])->group(function () {
+    // Category management
+    Route::get('categories', [CategoryController::class, 'index']);
+    Route::post('categories', [CategoryController::class, 'store']);
+    Route::get('categories/{id}', [CategoryController::class, 'show']);
+    Route::put('categories/{id}', [CategoryController::class, 'update']);
+    Route::delete('categories/{id}', [CategoryController::class, 'destroy']);
+    Route::get('categories/tree', [CategoryController::class, 'tree']); // Optional: for tree view
+});

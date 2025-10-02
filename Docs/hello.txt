@@ -25,6 +25,8 @@ docker-compose logs react
 # Enter Laravel container
 docker-compose exec laravel bash
 
+php artisan route:list | grep categories
+
 php artisan db:seed --class=AdminUserSeeder
 
 # Install missing packages

@@ -25,7 +25,7 @@ import Checkout from "./pages/Checkout";
 import AuthCallback from "./pages/AuthCallback";
 
 // Create router with future flags
-const router = createBrowserRouter(
+export const router = createBrowserRouter(
   [
     {
       path: "/",
