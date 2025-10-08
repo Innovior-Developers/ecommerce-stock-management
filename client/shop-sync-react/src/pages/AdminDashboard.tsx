@@ -65,6 +65,29 @@ import { Category } from "../types"; // ✅ Import the new type
 import ProductDetail from "@/components/admin forms/ProductDetail";
 import CategoryDetail from "@/components/admin forms/CategoryDetail";
 
+// At the top of the file, update the type
+interface Product {
+  _id?: string;
+  id?: string;
+  name: string;
+  description: string;
+  price: number;
+  category: string;
+  stock_quantity: number;
+  status: string;
+  image_url?: string;
+  images?: Array<{
+    url: string;
+    is_primary?: boolean;
+    filename?: string;
+  }>;
+  sku?: string;
+  weight?: number;
+  meta_title?: string;
+  meta_description?: string;
+  created_at: string;
+}
+
 const AdminDashboard = () => {
   // All hooks at the top level
   const [activeTab, setActiveTab] = useState("overview");
@@ -72,7 +95,7 @@ const AdminDashboard = () => {
   const [isEditProductOpen, setIsEditProductOpen] = useState(false);
   const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
   const [isEditCategoryOpen, setIsEditCategoryOpen] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<unknown>(null);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<unknown>(null);
   const [productSearch, setProductSearch] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
@@ -170,6 +193,15 @@ const AdminDashboard = () => {
 
   const handleUpdateProduct = async (id: string, data: unknown) => {
     try {
+      console.log("📝 Updating product - ID:", id); // ✅ Add this debug
+      console.log("📝 Updating product - Data:", data); // ✅ Add this debug
+
+      if (!id) {
+        console.error("❌ Product ID is undefined!");
+        toast.error("Product ID is missing. Cannot update product.");
+        return;
+      }
+
       const result = await updateProduct({ id, data }).unwrap();
       console.log("✅ Product updated:", result);
       toast.success("Product updated successfully!");
@@ -549,6 +581,7 @@ const AdminDashboard = () => {
                   </div>
                 ) : filteredProducts.length === 0 ? (
                   <div className="text-center py-8">
+                    ,
                     <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                     <h3 className="text-lg font-semibold">No products found</h3>
                     <p className="text-muted-foreground">
@@ -560,24 +593,39 @@ const AdminDashboard = () => {
                       onClick={() => setIsAddProductOpen(true)}
                       className="mt-4"
                     >
+                      ,
                       <Plus className="h-4 w-4 mr-2" />
                       Add Product
                     </Button>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredProducts.map((product: unknown) => (
-                      <ProductCard
-                        key={product._id || product.id} // ✅ FIX: Add fallback
-                        product={product}
-                        onEdit={(product) => {
-                          setSelectedProduct(product);
-                          setIsEditProductOpen(true);
-                        }}
-                        onDelete={(id) => handleDeleteProduct(id)}
-                        onView={handleViewProduct}
-                      />
-                    ))}
+                    {filteredProducts.map((product: unknown) => {
+                      // ✅ Debug: Log the product to see what ID fields it has
+                      console.log("🔍 Product in map:", {
+                        _id: product._id,
+                        id: product.id,
+                        name: product.name,
+                      });
+
+                      return (
+                        <ProductCard
+                          key={product._id || product.id}
+                          product={product} // ✅ Make sure the whole product is passed
+                          onEdit={(product) => {
+                            console.log("✏️ Edit clicked for product:", {
+                              _id: product._id,
+                              id: product.id,
+                              name: product.name,
+                            });
+                            setSelectedProduct(product); // ✅ Store the complete product
+                            setIsEditProductOpen(true);
+                          }}
+                          onDelete={(id) => handleDeleteProduct(id)}
+                          onView={handleViewProduct}
+                        />
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>

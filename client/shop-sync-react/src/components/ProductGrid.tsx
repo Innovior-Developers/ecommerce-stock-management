@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { Loader2 } from "lucide-react";
 import ProductCard from "./ProductCard";
+import ProductCardSkeleton from "./ProductCardSkeleton"; // ✅ Import skeleton
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -155,12 +156,39 @@ const ProductGrid = ({
     toast.success(`${product.name} added to cart`);
   };
 
-  // Loading state
+  // ✅ Loading state with skeleton loaders
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
+      <section className="py-12 bg-background">
+        <div className="container mx-auto px-4">
+          {/* Header - Show even while loading */}
+          {showHeader && (
+            <div className="mb-8">
+              <h2 className="text-3xl font-bold mb-2">{title}</h2>
+              <p className="text-muted-foreground">{description}</p>
+            </div>
+          )}
+
+          {/* Filters skeleton */}
+          {showFilters && (
+            <div className="flex flex-col md:flex-row gap-4 mb-8">
+              <div className="flex-1 flex gap-2">
+                <Skeleton className="h-10 w-32" />
+                <Skeleton className="h-10 w-32" />
+                <Skeleton className="h-10 w-32" />
+              </div>
+              <Skeleton className="h-10 w-48" />
+            </div>
+          )}
+
+          {/* Product Grid Skeleton */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {Array.from({ length: itemsPerPage }).map((_, index) => (
+              <ProductCardSkeleton key={index} />
+            ))}
+          </div>
+        </div>
+      </section>
     );
   }
 

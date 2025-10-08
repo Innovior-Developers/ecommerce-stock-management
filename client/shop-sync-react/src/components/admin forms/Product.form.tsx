@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"; // Add useState
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -23,7 +23,15 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Package, Edit, Trash2, Eye, DollarSign, X } from "lucide-react";
+import {
+  Package,
+  Edit,
+  Trash2,
+  Eye,
+  DollarSign,
+  X,
+  Loader2,
+} from "lucide-react"; // ✅ Add Loader2
 import {
   useCreateProductMutation,
   useUpdateProductMutation,
@@ -101,6 +109,9 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     Array<{ url: string; filename?: string }>
   >(product?.images || []);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+
+  // ✅ Add loading state
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -218,60 +229,124 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     setExistingImages(newExisting);
   };
 
-  const handleSubmit = (data: ProductFormValues) => {
+  const handleSubmit = async (data: ProductFormValues) => {
     console.log("🔍 Form data before processing:", data);
+    console.log("🔍 Product object:", product);
 
-    const formData = new FormData();
+    // ✅ Set submitting state
+    setIsSubmitting(true);
 
-    // Add form fields
-    Object.entries(data).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== "") {
-        formData.append(key, String(value));
+    try {
+      const formData = new FormData();
+
+      // Add form fields
+      Object.entries(data).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== "") {
+          formData.append(key, String(value));
+        }
+      });
+
+      // Add new images
+      selectedFiles.forEach((file, index) => {
+        formData.append(`images[${index}]`, file);
+      });
+
+      // For edit mode, send info about existing images to keep
+      if (mode === "edit" && existingImages.length > 0) {
+        formData.append("existing_images", JSON.stringify(existingImages));
       }
-    });
 
-    // Add new images
-    selectedFiles.forEach((file, index) => {
-      formData.append(`images[${index}]`, file);
-    });
+      // Add default values if missing
+      if (!formData.has("status")) {
+        formData.append("status", "active");
+      }
+      if (!formData.has("stock_quantity")) {
+        formData.append("stock_quantity", "0");
+      }
 
-    // For edit mode, send info about existing images to keep
-    if (mode === "edit" && existingImages.length > 0) {
-      formData.append("existing_images", JSON.stringify(existingImages));
+      console.log("📦 FormData contents:");
+      for (const [key, value] of formData.entries()) {
+        console.log(
+          `  ${key}:`,
+          value instanceof File ? `File: ${value.name}` : value
+        );
+      }
+
+      const productId = product?._id || product?.id;
+
+      console.log("🆔 Product ID:", productId);
+
+      if (mode === "edit" && productId && onUpdate) {
+        console.log("✏️ Updating product with ID:", productId);
+
+        // ✅ Show loading toast
+        const loadingToast = toast.loading("Updating product...");
+
+        try {
+          await onUpdate(productId, formData);
+
+          // ✅ Dismiss loading and show success
+          toast.dismiss(loadingToast);
+          toast.success("Product updated successfully! 🎉", {
+            description: `${data.name} has been updated.`,
+          });
+
+          // Reset and close
+          setSelectedFiles([]);
+          setImagePreviews([]);
+          setExistingImages([]);
+          onOpenChange(false);
+          form.reset();
+        } catch (error) {
+          toast.dismiss(loadingToast);
+          toast.error("Failed to update product", {
+            description: error?.message || "Please try again.",
+          });
+        }
+      } else if (mode === "edit" && !productId) {
+        console.error("❌ Product ID is missing! Cannot update.", product);
+        toast.error("Product ID is missing. Cannot update product.");
+      } else {
+        // ✅ Show loading toast for create
+        const loadingToast = toast.loading("Creating product...");
+
+        try {
+          await onSubmit(formData);
+
+          toast.dismiss(loadingToast);
+          toast.success("Product created successfully! 🎉", {
+            description: `${data.name} has been added to your inventory.`,
+          });
+
+          // Reset and close
+          setSelectedFiles([]);
+          setImagePreviews([]);
+          setExistingImages([]);
+          onOpenChange(false);
+          form.reset();
+        } catch (error) {
+          toast.dismiss(loadingToast);
+          toast.error("Failed to create product", {
+            description: error?.message || "Please try again.",
+          });
+        }
+      }
+    } catch (error) {
+      console.error("❌ Form submission error:", error);
+      toast.error("Something went wrong", {
+        description: "Please check your input and try again.",
+      });
+    } finally {
+      // ✅ Reset submitting state
+      setIsSubmitting(false);
     }
-
-    // Add default values if missing
-    if (!formData.has("status")) {
-      formData.append("status", "active");
-    }
-    if (!formData.has("stock_quantity")) {
-      formData.append("stock_quantity", "0");
-    }
-
-    console.log("📦 FormData contents:");
-    for (const [key, value] of formData.entries()) {
-      console.log(
-        `  ${key}:`,
-        value instanceof File ? `File: ${value.name}` : value
-      );
-    }
-
-    if (mode === "edit" && product && onUpdate) {
-      onUpdate(product._id, formData);
-    } else {
-      onSubmit(formData);
-    }
-
-    // Reset after submit
-    setSelectedFiles([]);
-    setImagePreviews([]);
-    setExistingImages([]);
-    onOpenChange(false);
-    form.reset();
   };
 
   const totalImages = selectedFiles.length + existingImages.length;
   const canAddMore = totalImages < 5;
+
+  // ✅ Combine all loading states
+  const isFormLoading = isLoading || isCreating || isUpdating || isSubmitting;
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -555,20 +630,26 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 setExistingImages([]);
                 onOpenChange(false);
               }}
+              disabled={isFormLoading}
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              disabled={isLoading || categories.length === 0}
+              disabled={isFormLoading || categories.length === 0}
             >
-              {isLoading
-                ? "Saving..."
-                : categories.length === 0
-                ? "Create Categories First"
-                : mode === "edit"
-                ? "Update Product"
-                : "Create Product"}
+              {isFormLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {mode === "edit" ? "Updating..." : "Creating..."}
+                </>
+              ) : categories.length === 0 ? (
+                "Create Categories First"
+              ) : mode === "edit" ? (
+                "Update Product"
+              ) : (
+                "Create Product"
+              )}
             </Button>
           </div>
         </form>
@@ -590,6 +671,20 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onDelete,
   onView,
 }) => {
+  // ✅ Add debug at the top
+  useEffect(() => {
+    console.log("🎴 ProductCard received product:", {
+      _id: product._id,
+      id: product.id,
+      name: product.name,
+    });
+  }, [product]);
+
+  const productId = product._id || product.id;
+
+  // ✅ Log the ID that will be used
+  console.log("🎴 ProductCard using ID:", productId);
+
   // Get the primary image URL
   const imageUrl =
     product.images && product.images.length > 0
@@ -597,8 +692,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       : product.image_url || "/placeholder.svg";
 
   // ✅ FIX: Get the correct ID
-  const productId = product._id || product.id;
-
   const getStockStatusColor = (quantity: number) => {
     if (quantity <= 0) return "bg-red-500";
     if (quantity <= 5) return "bg-orange-500";
