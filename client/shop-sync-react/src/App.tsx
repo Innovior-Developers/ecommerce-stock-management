@@ -1,3 +1,4 @@
+import { useEffect } from "react"; // ✅ Add useEffect
 import { Toaster } from "@/components/ui/toaster";
 import { ToastWrapper } from "@/components/ui/toast-wrapper";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,6 +7,7 @@ import { store } from "@/store";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AdminRoute from "@/components/AdminRoute";
+import { loadCartFromStorage } from "@/store/slices/cartSlice"; // ✅ Import
 
 // Import pages
 import Index from "./pages/Index";
@@ -73,11 +75,7 @@ export const router = createBrowserRouter(
     },
     {
       path: "/cart",
-      element: (
-        <ProtectedRoute>
-          <Cart />
-        </ProtectedRoute>
-      ),
+      element: <Cart />, // ✅ Remove ProtectedRoute - allow guests
     },
     {
       path: "/checkout",
@@ -116,13 +114,25 @@ export const router = createBrowserRouter(
   }
 );
 
-const App = () => (
-  <Provider store={store}>
+// ✅ Create a wrapper component to load cart on mount
+const AppContent = () => {
+  useEffect(() => {
+    // Load cart from localStorage when app starts
+    store.dispatch(loadCartFromStorage());
+  }, []);
+
+  return (
     <TooltipProvider>
       <Toaster />
-      <ToastWrapper /> {/* Use enhanced toast */}
+      <ToastWrapper />
       <RouterProvider router={router} />
     </TooltipProvider>
+  );
+};
+
+const App = () => (
+  <Provider store={store}>
+    <AppContent />
   </Provider>
 );
 

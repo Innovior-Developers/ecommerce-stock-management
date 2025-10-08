@@ -34,6 +34,7 @@ const Header = ({ isAdmin = false }: HeaderProps) => {
   const navigate = useNavigate();
 
   const { isAuthenticated, user } = useAppSelector((state) => state.auth);
+  const cartItemCount = useAppSelector((state) => state.cart.itemCount); // ✅ Get from cart state
   const [logout, { isLoading: isLoggingOut }] = useLogoutMutation();
 
   const handleSearch = (e: React.FormEvent) => {
@@ -60,8 +61,6 @@ const Header = ({ isAdmin = false }: HeaderProps) => {
       }
     }
   };
-
-  const cartItemsCount = 2; // This would come from cart state
 
   return (
     <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -96,66 +95,62 @@ const Header = ({ isAdmin = false }: HeaderProps) => {
             </form>
           )}
 
-            {/* Navigation Links */}
-            <nav className="flex items-center space-x-4">
-            <Link to="/" className="hover:text-primary transition-colors duration-200">
+          {/* Navigation Links */}
+          <nav className="flex items-center space-x-4">
+            <Link
+              to="/"
+              className="hover:text-primary transition-colors duration-200"
+            >
               Home
             </Link>
-            <Link to="/shop" className="hover:text-primary transition-colors duration-200">
+            <Link
+              to="/shop"
+              className="hover:text-primary transition-colors duration-200"
+            >
               Shop
             </Link>
-            <Link to="/deals" className="hover:text-primary transition-colors duration-200">
+            <Link
+              to="/deals"
+              className="hover:text-primary transition-colors duration-200"
+            >
               Deals
             </Link>
-            <Link to="/about" className="hover:text-primary transition-colors duration-200">
+            <Link
+              to="/about"
+              className="hover:text-primary transition-colors duration-200"
+            >
               About
             </Link>
-            <Link to="/contact" className="hover:text-primary transition-colors duration-200">
+            <Link
+              to="/contact"
+              className="hover:text-primary transition-colors duration-200"
+            >
               Contact
             </Link>
             {isAuthenticated && user?.role === "admin" && (
               <Link
-              to="/admin"
-              className="hover:text-primary transition-colors duration-200 text-primary font-semibold"
+                to="/admin"
+                className="hover:text-primary transition-colors duration-200 text-primary font-semibold"
               >
-              Admin
+                Admin
               </Link>
             )}
-            </nav>
+          </nav>
 
           {/* Navigation Icons */}
           <div className="flex items-center space-x-4">
-            {!isAdmin && (
-              <>
-                {/* Wishlist */}
-                <Button variant="ghost" size="icon" asChild>
-                  <Link to="/wishlist">
-                    <Heart className="h-5 w-5" />
-                    <span className="sr-only">Wishlist</span>
-                  </Link>
+            {/* Cart - Show for all users, not just authenticated */}
+            {!isAdmin && user?.role !== "admin" && (
+              <Link to="/cart">
+                <Button variant="ghost" size="icon" className="relative">
+                  <ShoppingCart className="h-5 w-5" />
+                  {cartItemCount > 0 && (
+                    <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs">
+                      {cartItemCount}
+                    </Badge>
+                  )}
                 </Button>
-
-                {/* Cart */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="relative"
-                  asChild
-                >
-                  <Link to="/cart">
-                    <ShoppingCart className="h-5 w-5" />
-                    {cartItemsCount > 0 && (
-                      <Badge
-                        variant="destructive"
-                        className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
-                      >
-                        {cartItemsCount}
-                      </Badge>
-                    )}
-                    <span className="sr-only">Shopping cart</span>
-                  </Link>
-                </Button>
-              </>
+              </Link>
             )}
 
             {/* User Menu */}

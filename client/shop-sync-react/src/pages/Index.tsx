@@ -8,7 +8,15 @@ const Index = () => {
       <Header />
       <main>
         <HeroSection />
-        <ProductGrid />
+
+        {/* Product Grid - Show header but hide filters on homepage */}
+        <ProductGrid
+          itemsPerPage={8}
+          showHeader={true}
+          showFilters={false} // ✅ Hide filters on homepage
+          title="Featured Products"
+          description="Discover our curated collection of premium items"
+        />
       </main>
 
       {/* Footer */}
@@ -29,34 +37,38 @@ const Index = () => {
             </div>
 
             <div>
-              <h4 className="font-semibold mb-4">Quick Links</h4>
-              <ul className="space-y-2 text-sm">
+              <h3 className="font-semibold mb-4">Quick Links</h3>
+              <ul className="space-y-2 text-sm text-primary-foreground/80">
                 <li>
-                  <a href="#" className="hover:text-accent transition-colors">
+                  <a
+                    href="/about"
+                    className="hover:text-accent transition-colors"
+                  >
                     About Us
                   </a>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-accent transition-colors">
+                  <a
+                    href="/contact"
+                    className="hover:text-accent transition-colors"
+                  >
                     Contact
                   </a>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-accent transition-colors">
-                    Shipping
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-accent transition-colors">
-                    Returns
+                  <a
+                    href="/shop"
+                    className="hover:text-accent transition-colors"
+                  >
+                    Shop
                   </a>
                 </li>
               </ul>
             </div>
 
             <div>
-              <h4 className="font-semibold mb-4">Categories</h4>
-              <ul className="space-y-2 text-sm">
+              <h3 className="font-semibold mb-4">Categories</h3>
+              <ul className="space-y-2 text-sm text-primary-foreground/80">
                 <li>
                   <a href="#" className="hover:text-accent transition-colors">
                     Electronics
@@ -75,6 +87,27 @@ const Index = () => {
                 <li>
                   <a href="#" className="hover:text-accent transition-colors">
                     Sports
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="font-semibold mb-4">Customer Service</h3>
+              <ul className="space-y-2 text-sm text-primary-foreground/80">
+                <li>
+                  <a href="#" className="hover:text-accent transition-colors">
+                    Shipping Info
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-accent transition-colors">
+                    Returns
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-accent transition-colors">
+                    FAQ
                   </a>
                 </li>
               </ul>

@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Filter, SortAsc, Grid, List } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import ProductCard from "./ProductCard";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Pagination,
@@ -19,131 +19,101 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-
-// Import product images
-import productHeadphones from "@/assets/product-headphones.jpg";
-import productWatch from "@/assets/product-watch.jpg";
-import productBag from "@/assets/product-bag.jpg";
-
-// Mock product data
-const backendProducts = [
-  {
-    id: "1",
-    name: "Premium Wireless Headphones",
-    price: 299.99,
-    originalPrice: 399.99,
-    images: [{ url: productHeadphones }],
-    category: "Electronics",
-    stock: 15,
-    rating: 4.8,
-    isNew: false,
-    isSale: true,
-  },
-  {
-    id: "2",
-    name: "Luxury Smart Watch",
-    price: 899.99,
-    images: [{ url: productWatch }],
-    category: "Electronics",
-    stock: 8,
-    rating: 4.9,
-    isNew: true,
-    isSale: false,
-  },
-  {
-    id: "3",
-    name: "Executive Leather Briefcase",
-    price: 349.99,
-    originalPrice: 449.99,
-    images: [{ url: productBag }],
-    category: "Accessories",
-    stock: 3,
-    rating: 4.7,
-    isNew: false,
-    isSale: true,
-  },
-  {
-    id: "4",
-    name: "Ultra-Light Laptop Stand",
-    price: 79.99,
-    images: [{ url: productHeadphones }], // Reusing for demo
-    category: "Office",
-    stock: 25,
-    rating: 4.5,
-    isNew: true,
-    isSale: false,
-  },
-  {
-    id: "5",
-    name: "Professional Camera Lens",
-    price: 1299.99,
-    images: [{ url: productWatch }], // Reusing for demo
-    category: "Photography",
-    stock: 0,
-    rating: 4.9,
-    isNew: false,
-    isSale: false,
-  },
-  {
-    id: "6",
-    name: "Ergonomic Office Chair",
-    price: 599.99,
-    originalPrice: 799.99,
-    images: [{ url: productBag }], // Reusing for demo
-    category: "Furniture",
-    stock: 12,
-    rating: 4.6,
-    isNew: false,
-    isSale: true,
-  },
-];
-
-const products = backendProducts.map((p) => ({
-  ...p,
-  images: p.images || [],
-  image: p.images?.[0]?.url || p.image_url || "/assets/default-product.jpg",
-}));
+import { useGetProductsQuery, Product } from "@/store/api/productsApi";
+import { useAppDispatch } from "@/store/hooks";
+import { addToCart } from "@/store/slices/cartSlice";
+import { toast } from "sonner";
 
 interface ProductGridProps {
   itemsPerPage?: number;
+  showHeader?: boolean; // ✅ Control header visibility
+  showFilters?: boolean; // ✅ Control filters visibility
+  title?: string; // ✅ Custom title
+  description?: string; // ✅ Custom description
 }
 
-const ProductGrid = ({ itemsPerPage = 8 }: ProductGridProps) => {
-  const [sortBy, setSortBy] = useState("name");
-  const [selectedCategory, setSelectedCategory] = useState("all");
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+const ProductGrid = ({
+  itemsPerPage = 8,
+  showHeader = true,
+  showFilters = true,
+  title = "Featured Products",
+  description = "Discover our curated collection of premium items",
+}: ProductGridProps) => {
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<string>("featured");
   const [currentPage, setCurrentPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState("");
 
+  const dispatch = useAppDispatch();
+
+  // Fetch products from API
+  const {
+    data: productsResponse,
+    isLoading,
+    error,
+  } = useGetProductsQuery({
+    search: searchQuery,
+  });
+
+  const products = productsResponse?.data || [];
+
+  // Get unique categories from products
   const categories = useMemo(() => {
-    const cats = [...new Set(products.map((p) => p.category))];
-    return ["all", ...cats];
-  }, []);
+    const uniqueCategories = new Set(products.map((p) => p.category));
+    return [
+      { id: "all", name: "All Products", count: products.length },
+      ...Array.from(uniqueCategories).map((cat) => ({
+        id: cat.toLowerCase(),
+        name: cat,
+        count: products.filter((p) => p.category === cat).length,
+      })),
+    ];
+  }, [products]);
 
+  const sortOptions = [
+    { value: "featured", label: "Featured" },
+    { value: "price-low", label: "Price: Low to High" },
+    { value: "price-high", label: "Price: High to Low" },
+    { value: "name", label: "Name: A-Z" },
+  ];
+
+  // Filter and sort products
   const filteredAndSortedProducts = useMemo(() => {
-    let filtered = products;
+    let filtered = [...products];
 
+    // Filter by category
     if (selectedCategory !== "all") {
-      filtered = filtered.filter((p) => p.category === selectedCategory);
+      filtered = filtered.filter(
+        (product) => product.category.toLowerCase() === selectedCategory
+      );
     }
 
+    // Filter active products only
+    filtered = filtered.filter((product) => product.status === "active");
+
+    // Sort products
     filtered.sort((a, b) => {
+      const getPrice = (price: number | string | undefined): number => {
+        if (typeof price === "string") return parseFloat(price) || 0;
+        return price || 0;
+      };
+
       switch (sortBy) {
         case "price-low":
-          return a.price - b.price;
+          return getPrice(a.price) - getPrice(b.price);
         case "price-high":
-          return b.price - a.price;
-        case "rating":
-          return (b.rating || 0) - (a.rating || 0);
+          return getPrice(b.price) - getPrice(a.price);
         case "name":
-        default:
           return a.name.localeCompare(b.name);
+        default:
+          return 0;
       }
     });
 
     return filtered;
-  }, [selectedCategory, sortBy]);
+  }, [products, selectedCategory, sortBy]);
 
-  // Pagination logic
+  // Pagination
   const totalPages = Math.ceil(filteredAndSortedProducts.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
@@ -154,220 +124,193 @@ const ProductGrid = ({ itemsPerPage = 8 }: ProductGridProps) => {
     setCurrentPage(1);
   }, [selectedCategory, sortBy]);
 
-  const handleAddToCart = (productId: string) => {
-    console.log("Adding to cart:", productId);
-    // Cart functionality would be implemented here
+  const handleAddToCart = (product: Product) => {
+    const parsePrice = (price: number | string | undefined): number => {
+      if (price === undefined || price === null) return 0;
+      const parsed = typeof price === "string" ? parseFloat(price) : price;
+      return isNaN(parsed) ? 0 : parsed;
+    };
+
+    const productId = product._id || product.id;
+
+    if (!productId) {
+      toast.error("Unable to add product to cart");
+      console.error("Product missing ID:", product);
+      return;
+    }
+
+    dispatch(
+      addToCart({
+        id: productId,
+        name: product.name,
+        price: parsePrice(product.price),
+        quantity: 1,
+        image:
+          product.images?.[0]?.url ||
+          product.image_url ||
+          "/assets/default-product.jpg",
+        stock_quantity: product.stock_quantity,
+      })
+    );
+    toast.success(`${product.name} added to cart`);
   };
 
-  const handleQuickView = (productId: string) => {
-    console.log("Quick view:", productId);
-    // Modal or navigation to product details
-  };
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
-  const handleToggleFavorite = (productId: string) => {
-    console.log("Toggle favorite:", productId);
-    // Favorite functionality would be implemented here
-  };
+  // Error state
+  if (error) {
+    return (
+      <div className="text-center py-20">
+        <p className="text-red-500">
+          Failed to load products. Please try again later.
+        </p>
+      </div>
+    );
+  }
+
+  // Empty state
+  if (products.length === 0) {
+    return (
+      <div className="text-center py-20">
+        <p className="text-muted-foreground">
+          No products available at the moment.
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <section className="py-12">
+    <section className="py-12 bg-background">
       <div className="container mx-auto px-4">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-          <div>
-            <h2 className="text-3xl font-bold mb-2">Featured Products</h2>
-            <p className="text-muted-foreground">
-              Discover our curated selection of premium products
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Button
-              variant={viewMode === "grid" ? "default" : "ghost"}
-              size="icon"
-              onClick={() => setViewMode("grid")}
-            >
-              <Grid className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={viewMode === "list" ? "default" : "ghost"}
-              size="icon"
-              onClick={() => setViewMode("list")}
-            >
-              <List className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-
-        {/* Filters and Sorting */}
-        <Card className="mb-8">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Filter className="h-5 w-5" />
-              Filters & Sorting
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col md:flex-row gap-4">
-              {/* Category Filter */}
-              <div className="flex-1">
-                <label className="text-sm font-medium mb-2 block">
-                  Category
-                </label>
-                <Select
-                  value={selectedCategory}
-                  onValueChange={setSelectedCategory}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((category) => (
-                      <SelectItem key={category} value={category}>
-                        {category === "all" ? "All Categories" : category}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Sort */}
-              <div className="flex-1">
-                <label className="text-sm font-medium mb-2 block">
-                  Sort By
-                </label>
-                <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sort by" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="name">Name A-Z</SelectItem>
-                    <SelectItem value="price-low">
-                      Price: Low to High
-                    </SelectItem>
-                    <SelectItem value="price-high">
-                      Price: High to Low
-                    </SelectItem>
-                    <SelectItem value="rating">Highest Rated</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Active filters */}
-            <div className="flex flex-wrap gap-2 mt-4">
-              {selectedCategory !== "all" && (
-                <Badge variant="secondary" className="gap-2">
-                  Category: {selectedCategory}
-                  <button
-                    onClick={() => setSelectedCategory("all")}
-                    className="ml-1 hover:text-destructive"
-                  >
-                    ×
-                  </button>
-                </Badge>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Results Info */}
-        <div className="flex justify-between items-center mb-6">
-          <p className="text-sm text-muted-foreground">
-            Showing {startIndex + 1}-
-            {Math.min(endIndex, filteredAndSortedProducts.length)} of{" "}
-            {filteredAndSortedProducts.length} products
-          </p>
-        </div>
-
-        {/* Products Grid */}
-        <div
-          className={`grid gap-6 ${
-            viewMode === "grid"
-              ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-              : "grid-cols-1"
-          }`}
-        >
-          {currentProducts.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              onAddToCart={handleAddToCart}
-              onQuickView={handleQuickView}
-              onToggleFavorite={handleToggleFavorite}
-            />
-          ))}
-        </div>
-
-        {filteredAndSortedProducts.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground text-lg mb-4">
-              No products found matching your criteria
-            </p>
-            <Button
-              onClick={() => {
-                setSelectedCategory("all");
-                setSortBy("name");
-              }}
-            >
-              Clear Filters
-            </Button>
+        {/* Header - Conditionally render */}
+        {showHeader && (
+          <div className="mb-8">
+            <h2 className="text-3xl font-bold mb-2">{title}</h2>
+            <p className="text-muted-foreground">{description}</p>
           </div>
         )}
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="mt-12">
-            <Pagination>
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      if (currentPage > 1) setCurrentPage(currentPage - 1);
-                    }}
-                    className={
-                      currentPage === 1 ? "pointer-events-none opacity-50" : ""
+        {/* Filters and Controls - Conditionally render */}
+        {showFilters && (
+          <div className="flex flex-col md:flex-row gap-4 mb-8">
+            {/* Category Filter */}
+            <div className="flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                {categories.map((category) => (
+                  <Button
+                    key={category.id}
+                    variant={
+                      selectedCategory === category.id ? "default" : "outline"
                     }
-                  />
-                </PaginationItem>
+                    onClick={() => setSelectedCategory(category.id)}
+                    className="rounded-full"
+                  >
+                    {category.name}
+                    <Badge variant="secondary" className="ml-2">
+                      {category.count}
+                    </Badge>
+                  </Button>
+                ))}
+              </div>
+            </div>
 
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                  (page) => (
-                    <PaginationItem key={page}>
-                      <PaginationLink
-                        href="#"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setCurrentPage(page);
-                        }}
-                        isActive={currentPage === page}
-                      >
-                        {page}
-                      </PaginationLink>
-                    </PaginationItem>
-                  )
-                )}
-
-                <PaginationItem>
-                  <PaginationNext
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      if (currentPage < totalPages)
-                        setCurrentPage(currentPage + 1);
-                    }}
-                    className={
-                      currentPage === totalPages
-                        ? "pointer-events-none opacity-50"
-                        : ""
-                    }
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
+            {/* Sort Controls */}
+            <div className="flex gap-2">
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sortOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+        )}
+
+        {/* Products Grid */}
+        {currentProducts.length === 0 ? (
+          <Card className="p-12 text-center">
+            <p className="text-muted-foreground">
+              No products found matching your filters.
+            </p>
+          </Card>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {currentProducts.map((product) => {
+                const productKey =
+                  product._id || product.id || `product-${product.name}`;
+
+                return (
+                  <ProductCard
+                    key={productKey}
+                    product={product}
+                    onAddToCart={handleAddToCart}
+                  />
+                );
+              })}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="mt-12">
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        onClick={() =>
+                          setCurrentPage((p) => Math.max(1, p - 1))
+                        }
+                        className={
+                          currentPage === 1
+                            ? "pointer-events-none opacity-50"
+                            : ""
+                        }
+                      />
+                    </PaginationItem>
+
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                      (page) => (
+                        <PaginationItem key={page}>
+                          <PaginationLink
+                            onClick={() => setCurrentPage(page)}
+                            isActive={currentPage === page}
+                          >
+                            {page}
+                          </PaginationLink>
+                        </PaginationItem>
+                      )
+                    )}
+
+                    <PaginationItem>
+                      <PaginationNext
+                        onClick={() =>
+                          setCurrentPage((p) => Math.min(totalPages, p + 1))
+                        }
+                        className={
+                          currentPage === totalPages
+                            ? "pointer-events-none opacity-50"
+                            : ""
+                        }
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            )}
+          </>
         )}
       </div>
     </section>

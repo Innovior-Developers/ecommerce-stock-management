@@ -6,14 +6,22 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card";
 // Update the interface to handle both id formats
 interface Product {
   _id?: string;
-  id?: string; // ✅ Add this
+  id?: string;
   name: string;
   description: string;
-  price: number;
+  price: number | string; // ✅ Allow both types
+  originalPrice?: number | string; // ✅ Allow both types
   category: string;
   stock_quantity: number;
   status: string;
   image_url?: string;
+  images?: Array<{
+    url: string;
+    is_primary?: boolean;
+    filename?: string;
+  }>;
+  rating?: number;
+  isNew?: boolean;
   weight?: number;
   meta_title?: string;
   meta_description?: string;
@@ -22,22 +30,32 @@ interface Product {
 
 interface ProductCardProps {
   product: Product;
-  onAddToCart?: (productId: string) => void;
+  onAddToCart?: (product: Product) => void; // ✅ Pass whole product
   onQuickView?: (productId: string) => void;
   onToggleFavorite?: (productId: string) => void;
   onEdit?: (product: Product) => void;
   onDelete?: (productId: string) => void;
 }
 
-const ProductCard = ({ product, ...props }: ProductCardProps) => {
-  // ✅ Corrected and simplified image URL logic
+const ProductCard = ({ product, onAddToCart, ...props }: ProductCardProps) => {
+  // ✅ Helper function to safely parse price
+  const parsePrice = (price: number | string | undefined): number => {
+    if (price === undefined || price === null) return 0;
+    const parsed = typeof price === "string" ? parseFloat(price) : price;
+    return isNaN(parsed) ? 0 : parsed;
+  };
+
+  // ✅ Parse prices safely
+  const productPrice = parsePrice(product.price);
+  const originalPrice = parsePrice(product.originalPrice);
+
+  // Image URL logic
   const imageUrl =
     product.images && product.images.length > 0
       ? product.images[0].url
       : product.image_url || "/assets/default-product.jpg";
 
   const getStockStatus = () => {
-    // The property is stock_quantity, not stock
     if (product.stock_quantity === 0)
       return { status: "out", label: "Out of Stock", className: "stock-out" };
     if (product.stock_quantity <= 5)
@@ -50,10 +68,8 @@ const ProductCard = ({ product, ...props }: ProductCardProps) => {
   };
 
   const stockInfo = getStockStatus();
-  const isOnSale =
-    product.originalPrice && product.originalPrice > product.price;
-
-  const productId = product._id || product.id; // ✅ Handle both formats
+  const isOnSale = originalPrice > 0 && originalPrice > productPrice;
+  const productId = product._id || product.id;
 
   return (
     <Card className="product-card group overflow-hidden border-0 shadow-md hover:shadow-lg bg-card">
@@ -87,7 +103,7 @@ const ProductCard = ({ product, ...props }: ProductCardProps) => {
             size="icon"
             variant="secondary"
             className="h-8 w-8 bg-white/90 hover:bg-white"
-            onClick={() => onToggleFavorite?.(product.id)}
+            onClick={() => props.onToggleFavorite?.(productId)}
           >
             <Heart className="h-4 w-4" />
           </Button>
@@ -95,7 +111,7 @@ const ProductCard = ({ product, ...props }: ProductCardProps) => {
             size="icon"
             variant="secondary"
             className="h-8 w-8 bg-white/90 hover:bg-white"
-            onClick={() => onQuickView?.(product.id)}
+            onClick={() => props.onQuickView?.(productId)}
           >
             <Eye className="h-4 w-4" />
           </Button>
@@ -113,11 +129,11 @@ const ProductCard = ({ product, ...props }: ProductCardProps) => {
 
           <div className="flex items-center gap-2">
             <span className={isOnSale ? "price-sale" : "price-current"}>
-              ${product.price.toFixed(2)}
+              ${productPrice.toFixed(2)}
             </span>
             {isOnSale && (
               <span className="price-original">
-                ${product.originalPrice?.toFixed(2)}
+                ${originalPrice.toFixed(2)}
               </span>
             )}
           </div>
@@ -140,7 +156,7 @@ const ProductCard = ({ product, ...props }: ProductCardProps) => {
           className="w-full"
           variant={stockInfo.status === "out" ? "outline" : "cart"}
           disabled={stockInfo.status === "out"}
-          onClick={() => onAddToCart?.(product.id)}
+          onClick={() => onAddToCart?.(product)} // ✅ Pass whole product
         >
           <ShoppingCart className="h-4 w-4" />
           {stockInfo.status === "out" ? "Out of Stock" : "Add to Cart"}
