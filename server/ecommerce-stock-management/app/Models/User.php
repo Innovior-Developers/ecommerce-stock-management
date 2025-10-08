@@ -4,13 +4,12 @@ namespace App\Models;
 
 use MongoDB\Laravel\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Tymon\JWTAuth\Contracts\JWTSubject;
-use Carbon\Carbon;
+use Illuminate\Support\Facades\Hash;
 
 class User extends Authenticatable implements JWTSubject
 {
-    use Notifiable, HasFactory;
+    use Notifiable;
 
     protected $connection = 'mongodb';
     protected $collection = 'users';
@@ -21,10 +20,8 @@ class User extends Authenticatable implements JWTSubject
         'password',
         'role',
         'status',
-        'email_verified_at',
-        'provider',
-        'provider_id',
         'avatar',
+        'email_verified_at',
     ];
 
     protected $hidden = [
@@ -34,24 +31,20 @@ class User extends Authenticatable implements JWTSubject
 
     protected $casts = [
         'email_verified_at' => 'datetime',
-        'password' => 'hashed',
     ];
 
-    protected $dates = [
-        'email_verified_at',
-    ];
+    // ✅ Auto-hash password on save
+    public function setPasswordAttribute($value)
+    {
+        $this->attributes['password'] = Hash::make($value);
+    }
 
-    /**
-     * Get the identifier that will be stored in the subject claim of the JWT.
-     */
+    // JWT methods
     public function getJWTIdentifier()
     {
         return $this->getKey();
     }
 
-    /**
-     * Return a key value array, containing any custom claims to be added to the JWT.
-     */
     public function getJWTCustomClaims()
     {
         return [
@@ -60,21 +53,5 @@ class User extends Authenticatable implements JWTSubject
             'email' => $this->email,
             'name' => $this->name,
         ];
-    }
-
-    // Relationships
-    public function customer()
-    {
-        return $this->hasOne(Customer::class, 'user_id', '_id');
-    }
-
-    /**
-     * Set the email verified at timestamp
-     */
-    public function setEmailVerifiedAtAttribute($value)
-    {
-        $this->attributes['email_verified_at'] = $value instanceof Carbon
-            ? $value
-            : Carbon::parse($value);
     }
 }
