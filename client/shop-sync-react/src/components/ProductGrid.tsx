@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton"; // ✅ ADD THIS LINE
 import {
   Pagination,
   PaginationContent,
@@ -27,10 +28,10 @@ import { toast } from "sonner";
 
 interface ProductGridProps {
   itemsPerPage?: number;
-  showHeader?: boolean; // ✅ Control header visibility
-  showFilters?: boolean; // ✅ Control filters visibility
-  title?: string; // ✅ Custom title
-  description?: string; // ✅ Custom description
+  showHeader?: boolean;
+  showFilters?: boolean;
+  title?: string;
+  description?: string;
 }
 
 const ProductGrid = ({
