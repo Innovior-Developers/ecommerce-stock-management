@@ -5,10 +5,14 @@ namespace App\Models;
 use MongoDB\Laravel\Eloquent\Model;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Log; // Add this import for Log facade
+use Illuminate\Support\Facades\Log;
+use App\Traits\MongoIdHelper;
+use App\Services\QuerySanitizer;
 
 class Product extends Model
 {
+    use MongoIdHelper;
+
     protected $connection = 'mongodb';
     protected $collection = 'products';
 
@@ -28,6 +32,7 @@ class Product extends Model
     ];
 
     protected $casts = [
+        '_id' => 'string',
         'price' => 'decimal:2',
         'stock_quantity' => 'integer',
         'weight' => 'decimal:2',
@@ -369,6 +374,12 @@ class Product extends Model
         return $query->where('stock_quantity', '<=', $threshold);
     }
 
+    public function scopeByIds($query, array $ids)
+    {
+        $validIds = QuerySanitizer::sanitizeMongoIds($ids);
+        return $query->whereIn('_id', $validIds);
+    }
+
     // Accessors
     public function getIsInStockAttribute()
     {
@@ -378,5 +389,11 @@ class Product extends Model
     public function getIsLowStockAttribute()
     {
         return $this->stock_quantity <= 10 && $this->stock_quantity > 0;
+    }
+
+    // Override primary key handling
+    public function getRouteKeyName()
+    {
+        return '_id';
     }
 }

@@ -12,6 +12,8 @@ use Tymon\JWTAuth\Facades\JWTAuth;
 use Tymon\JWTAuth\Exceptions\JWTException;
 use Tymon\JWTAuth\Exceptions\TokenExpiredException;
 use Tymon\JWTAuth\Exceptions\TokenInvalidException;
+use App\Services\QuerySanitizer;
+use Illuminate\Support\Facades\Log;
 
 class JWTAuthController extends Controller
 {
@@ -25,7 +27,9 @@ class JWTAuthController extends Controller
             'password' => 'required|string',
         ]);
 
-        $user = User::where('email', $credentials['email'])->first();
+        $email = QuerySanitizer::sanitize($credentials['email']);
+
+        $user = User::where('email', $email)->first();
 
         if (!$user || !Hash::check($credentials['password'], $user->password)) {
             throw ValidationException::withMessages([
@@ -62,7 +66,9 @@ class JWTAuthController extends Controller
             'password' => 'required|string',
         ]);
 
-        $user = User::where('email', $credentials['email'])->where('role', 'customer')->first();
+        $email = QuerySanitizer::sanitize($credentials['email']);
+
+        $user = User::where('email', $email)->where('role', 'customer')->first();
 
         if (!$user || !Hash::check($credentials['password'], $user->password)) {
             throw ValidationException::withMessages([
@@ -83,40 +89,103 @@ class JWTAuthController extends Controller
     }
 
     /**
-     * Customer Register
+     * Customer Register - DEFINITIVE FIX
      */
     public function customerRegister(Request $request)
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:8|confirmed',
-            'first_name' => 'nullable|string|max:255',
-            'last_name' => 'nullable|string|max:255',
-            'phone' => 'nullable|string|max:20',
-        ]);
+        Log::info('=== REGISTRATION START ===');
 
-        $user = User::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'password' => $validated['password'],
-            'role' => 'customer',
-            'status' => 'active',
-            'email_verified_at' => now(),
-        ]);
+        try {
+            $validated = $request->validate([
+                'name' => 'required|string|max:255',
+                'email' => 'required|string|email|max:255|unique:users,email',
+                'password' => 'required|string|min:8|confirmed',
+                'first_name' => 'nullable|string|max:255',
+                'last_name' => 'nullable|string|max:255',
+                'phone' => 'nullable|string|max:20',
+            ]);
 
-        // Create customer profile
-        Customer::create([
-            'user_id' => $user->_id,
-            'first_name' => $validated['first_name'] ?? '',
-            'last_name' => $validated['last_name'] ?? '',
-            'phone' => $validated['phone'] ?? '',
-            'marketing_consent' => false,
-        ]);
+            Log::info('Validation passed');
 
-        $token = JWTAuth::fromUser($user);
+            // ✅ BULLETPROOF FIX: Create user and immediately retrieve from DB
+            $userData = [
+                'name' => QuerySanitizer::sanitize($validated['name']),
+                'email' => QuerySanitizer::sanitize($validated['email']),
+                'password' => $validated['password'], // Mutator will hash
+                'role' => 'customer',
+                'status' => 'active',
+                'email_verified_at' => now(),
+            ];
 
-        return $this->respondWithToken($token, $user, 'Registration successful', 201);
+            // Step 1: Insert the user
+            User::create($userData);
+
+            // Step 2: IMMEDIATELY retrieve the user from database
+            // This ensures we have the _id that MongoDB assigned
+            $user = User::where('email', $userData['email'])->firstOrFail();
+
+            Log::info('User retrieved from database with _id:', [
+                '_id' => $user->_id,
+                'id_type' => gettype($user->_id),
+            ]);
+
+            // Step 3: Verify we have the _id
+            if (!$user->_id) {
+                Log::critical('IMPOSSIBLE: User exists in DB but _id is still null');
+                throw new \Exception('Failed to retrieve user ID after creation');
+            }
+
+            // Step 4: Create customer profile
+            $customer = Customer::create([
+                'user_id' => (string) $user->_id,
+                'first_name' => QuerySanitizer::sanitize($validated['first_name'] ?? ''),
+                'last_name' => QuerySanitizer::sanitize($validated['last_name'] ?? ''),
+                'phone' => QuerySanitizer::sanitize($validated['phone'] ?? ''),
+                'marketing_consent' => false,
+            ]);
+
+            Log::info('Customer profile created:', ['customer_id' => $customer->_id]);
+
+            // Step 5: Generate JWT token
+            $token = JWTAuth::fromUser($user);
+
+            Log::info('=== REGISTRATION SUCCESS ===');
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Registration successful',
+                'user' => [
+                    'id' => (string) $user->_id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'role' => $user->role,
+                    'status' => $user->status,
+                    'avatar' => $user->avatar,
+                ],
+                'token' => $token,
+                'token_type' => 'bearer',
+                'expires_in' => config('jwt.ttl') * 60
+            ], 201);
+
+        } catch (ValidationException $e) {
+            Log::warning('Validation failed', ['errors' => $e->errors()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+
+        } catch (\Exception $e) {
+            Log::error('Registration error:', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Registration failed: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
@@ -137,7 +206,6 @@ class JWTAuthController extends Controller
             return response()->json([
                 'success' => true,
                 'user' => [
-                    'id' => $user->_id,
                     'name' => $user->name,
                     'email' => $user->email,
                     'role' => $user->role,
@@ -167,7 +235,7 @@ class JWTAuthController extends Controller
     }
 
     /**
-     * Log the user out (Invalidate the token)
+     * Logout User (Invalidate token)
      */
     public function logout()
     {
@@ -187,38 +255,36 @@ class JWTAuthController extends Controller
     }
 
     /**
-     * Refresh a token
+     * Refresh JWT token
      */
     public function refresh()
     {
         try {
-            $token = JWTAuth::refresh(JWTAuth::getToken());
-            $user = JWTAuth::setToken($token)->toUser();
+            $newToken = JWTAuth::refresh(JWTAuth::getToken());
 
-            return $this->respondWithToken($token, $user, 'Token refreshed successfully');
+            return response()->json([
+                'success' => true,
+                'token' => $newToken,
+                'token_type' => 'bearer',
+                'expires_in' => config('jwt.ttl') * 60
+            ]);
         } catch (TokenExpiredException $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Token has expired and cannot be refreshed',
                 'error_code' => 'TOKEN_EXPIRED'
             ], 401);
-        } catch (TokenInvalidException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Token is invalid',
-                'error_code' => 'TOKEN_INVALID'
-            ], 401);
         } catch (JWTException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Token is required',
-                'error_code' => 'TOKEN_ABSENT'
-            ], 401);
+                'message' => 'Could not refresh token',
+                'error_code' => 'TOKEN_REFRESH_FAILED'
+            ], 500);
         }
     }
 
     /**
-     * Get the token array structure
+     * Get the token array structure.
      */
     protected function respondWithToken($token, $user, $message, $statusCode = 200)
     {
@@ -226,7 +292,6 @@ class JWTAuthController extends Controller
             'success' => true,
             'message' => $message,
             'user' => [
-                'id' => $user->_id,
                 'name' => $user->name,
                 'email' => $user->email,
                 'role' => $user->role,

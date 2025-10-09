@@ -14,6 +14,11 @@ class User extends Authenticatable implements JWTSubject
     protected $connection = 'mongodb';
     protected $collection = 'users';
 
+    // ✅ These properties are the ONLY correct way to handle MongoDB IDs
+    protected $primaryKey = '_id';
+    protected $keyType = 'string';
+    public $incrementing = false;
+
     protected $fillable = [
         'name',
         'email',
@@ -30,16 +35,20 @@ class User extends Authenticatable implements JWTSubject
     ];
 
     protected $casts = [
+        '_id' => 'string',
         'email_verified_at' => 'datetime',
     ];
 
-    // ✅ Auto-hash password on save
+    /**
+     * Auto-hash password on save. This is crucial for User::create().
+     */
     public function setPasswordAttribute($value)
     {
-        $this->attributes['password'] = Hash::make($value);
+        if (!empty($value)) {
+            $this->attributes['password'] = Hash::make($value);
+        }
     }
 
-    // JWT methods
     public function getJWTIdentifier()
     {
         return $this->getKey();
@@ -53,5 +62,10 @@ class User extends Authenticatable implements JWTSubject
             'email' => $this->email,
             'name' => $this->name,
         ];
+    }
+
+    public function customer()
+    {
+        return $this->hasOne(Customer::class, 'user_id', '_id');
     }
 }

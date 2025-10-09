@@ -1,32 +1,59 @@
 services:
   # Laravel Backend
   laravel:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: esm_laravel
     ports:
       - "8000:8000"
     volumes:
       - ./ecommerce-stock-management:/var/www/html
+      - /var/www/html/vendor
+      - /var/www/html/node_modules
     env_file:
-      - ./.env.docker # This is now the single source of truth
+      - ./.env.docker
+    environment:
+      - COMPOSER_ALLOW_SUPERUSER=1
+    # ✅ ADD DNS SERVERS
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+      - 1.1.1.1
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     networks:
       - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # Redis
   redis:
     image: redis:7-alpine
+    container_name: esm_redis
     restart: unless-stopped
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     networks:
       - app-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   redis_data:
+    driver: local
 
 networks:
   app-network:

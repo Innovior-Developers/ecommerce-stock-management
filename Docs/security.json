@@ -1,0 +1,908 @@
+{
+    "securityAnalysis": {
+        "title": "Security Analysis & Implementation Plan",
+        "parts": [
+            {
+                "partNumber": 1,
+                "title": "Critical Security Vulnerabilities",
+                "vulnerabilities": [
+                    {
+                        "id": 1,
+                        "title": "Secrets & Credentials Exposure",
+                        "severity": "CRITICAL",
+                        "issuesFound": [
+                            ".env file with real credentials committed to repository",
+                            ".env.docker file with production credentials visible",
+                            "MongoDB connection strings with passwords in plaintext",
+                            "AWS credentials hardcoded (AKIA35H3WLNDUQMD5MU2)",
+                            "JWT secrets exposed (Nlnxt12fXflI1XJghAlN7GOYqcZlB5RtlQDToJ34QXNpEY7SuGrC3dLLm01SF99c)",
+                            "Social OAuth credentials visible in services.php"
+                        ],
+                        "securityImpact": [
+                            "Database can be accessed by anyone with these credentials",
+                            "AWS S3 bucket can be compromised",
+                            "JWT tokens can be forged",
+                            "Complete system breach possible"
+                        ]
+                    },
+                    {
+                        "id": 2,
+                        "title": "MongoDB ID Inconsistency",
+                        "severity": "HIGH",
+                        "issuesFound": [
+                            "Models use _id (MongoDB convention)",
+                            "Frontend expects id in some places, _id in others",
+                            "No consistent ID accessor pattern",
+                            "Relationships reference both formats interchangeably",
+                            "API responses sometimes return _id, sometimes id"
+                        ],
+                        "filesAffected": [
+                            "Product.php",
+                            "Category.php",
+                            "Order.php",
+                            "Customer.php",
+                            "Inventory.php",
+                            "ProductController.php",
+                            "CategoryController.php"
+                        ],
+                        "problemsCaused": [
+                            "Frontend fails to update/delete items",
+                            "Foreign key relationships break",
+                            "Inventory tracking fails",
+                            "Order processing errors"
+                        ]
+                    },
+                    {
+                        "id": 3,
+                        "title": "Input Validation & Injection Vulnerabilities",
+                        "severity": "CRITICAL",
+                        "issuesFound": [
+                            "No input sanitization middleware globally applied",
+                            "Search queries in ProductController::index() vulnerable to NoSQL injection",
+                            "Category filters use raw user input without sanitization",
+                            "No protection against $where, $regex, $ne MongoDB operators",
+                            "User-provided data directly inserted into database queries"
+                        ],
+                        "exampleVulnerableCode": "if ($search) {\n    $query->where('name', 'like', \"%{$search}%\");\n}",
+                        "attackVector": "An attacker could send: ?search={\"$ne\": null} to dump all products or inject malicious queries"
+                    },
+                    {
+                        "id": 4,
+                        "title": "Authentication & Session Security",
+                        "severity": "HIGH",
+                        "issuesFound": [
+                            "JWT tokens don't expire (or have very long expiry: 1440 minutes)",
+                            "No token blacklist implementation despite config claiming it's enabled",
+                            "No refresh token rotation (tokens can be reused indefinitely)",
+                            "Missing rate limiting on login endpoints",
+                            "Password reset functionality not implemented",
+                            "No account lockout after failed attempts"
+                        ],
+                        "specificIssues": {
+                            "file": "JWTAuthController.php",
+                            "problems": [
+                                "Logout doesn't actually invalidate tokens server-side",
+                                "Refresh tokens don't rotate (old tokens remain valid)",
+                                "No IP-based validation"
+                            ]
+                        }
+                    },
+                    {
+                        "id": 5,
+                        "title": "File Upload Security",
+                        "severity": "CRITICAL",
+                        "file": "Product.php::uploadImage()",
+                        "problems": [
+                            "No MIME type validation - accepts any file disguised as image",
+                            "No file size limits enforced - can upload arbitrarily large files",
+                            "No malware scanning - direct upload to S3",
+                            "Predictable filenames - timestamp_random8chars.ext is guessable",
+                            "No image dimension validation - can upload 1px or 10000px images",
+                            "No virus scanning before storage"
+                        ],
+                        "attackScenario": "Attacker uploads malware.php.jpg → Executes code → Server compromise"
+                    },
+                    {
+                        "id": 6,
+                        "title": "Authorization Bypass Risks",
+                        "severity": "MEDIUM",
+                        "issuesFound": [
+                            "AdminMiddleware.php only checks role field",
+                            "No RBAC (Role-Based Access Control) granularity",
+                            "Users can modify their own role field if they gain access",
+                            "No permission-based restrictions (only role-based)"
+                        ],
+                        "missingProtections": [
+                            "Admin actions not logged (no audit trail)",
+                            "No IP whitelisting for admin panel",
+                            "No 2FA implementation"
+                        ]
+                    },
+                    {
+                        "id": 7,
+                        "title": "Error Handling & Information Disclosure",
+                        "severity": "MEDIUM",
+                        "issuesFound": [
+                            "APP_DEBUG=true in environment files",
+                            "Stack traces exposed to clients in production",
+                            "Database schema leaked in error messages",
+                            "Sensitive variable names visible in exceptions"
+                        ],
+                        "exampleLeak": {
+                            "error": "SQLSTATE[HY000]: Connection refused to mongodb://user:pass@host",
+                            "trace": "... shows internal paths ..."
+                        }
+                    },
+                    {
+                        "id": 8,
+                        "title": "CORS & CSRF Misconfigurations",
+                        "severity": "MEDIUM",
+                        "corsIssues": {
+                            "file": "cors.php",
+                            "problems": [
+                                "supports_credentials: true + allowed_origins: ['*'] = Security Risk",
+                                "Current config only allows http://localhost:3000 (good) but needs production update"
+                            ]
+                        },
+                        "csrfIssues": {
+                            "file": "VerifyCsrfToken.php",
+                            "problems": [
+                                "All API routes excluded from CSRF protection",
+                                "Relies solely on JWT, no additional token validation"
+                            ]
+                        }
+                    },
+                    {
+                        "id": 9,
+                        "title": "Docker Security Issues",
+                        "severity": "MEDIUM",
+                        "dockerfileIssues": [
+                            "Container runs as root user (line not explicitly setting non-root)",
+                            "Redis exposed on 0.0.0.0:6379 (should be internal only)",
+                            "No health checks defined",
+                            "Secrets passed via environment variables (less secure than Docker secrets)"
+                        ],
+                        "dockerComposeIssues": [
+                            "Environment file references .env.docker with secrets",
+                            "No resource limits (CPU/memory)",
+                            "No security options (no-new-privileges, read-only filesystem)"
+                        ]
+                    },
+                    {
+                        "id": 10,
+                        "title": "Logging & Monitoring Gaps",
+                        "severity": "LOW-MEDIUM",
+                        "missing": [
+                            "No centralized logging solution",
+                            "Failed login attempts not tracked",
+                            "Suspicious activity not monitored (e.g., mass data exports)",
+                            "No audit logs for admin actions",
+                            "No alerting for security events"
+                        ]
+                    }
+                ]
+            },
+            {
+                "partNumber": 2,
+                "title": "Step-by-Step Implementation Plan",
+                "phases": [
+                    {
+                        "phase": 1,
+                        "title": "Emergency Security Fixes (DO IMMEDIATELY)",
+                        "steps": [
+                            {
+                                "step": "1.1",
+                                "title": "Revoke & Rotate All Exposed Credentials",
+                                "actions": [
+                                    {
+                                        "task": "Immediately revoke AWS credentials visible in code",
+                                        "details": [
+                                            "Go to AWS IAM Console",
+                                            "Deactivate keys: AKIA35H3WLNDUQMD5MU2",
+                                            "Generate new keys with minimum required permissions (S3 read/write only)"
+                                        ]
+                                    },
+                                    {
+                                        "task": "Rotate MongoDB password",
+                                        "details": [
+                                            "Log into MongoDB Atlas",
+                                            "Change password for user thisarad28_db_user",
+                                            "Update DSN in local .env ONLY (never commit)"
+                                        ]
+                                    },
+                                    {
+                                        "task": "Generate new JWT secret",
+                                        "command": "php artisan jwt:secret --force",
+                                        "note": "This updates .env with new secure random string"
+                                    },
+                                    {
+                                        "task": "Remove sensitive files from Git history",
+                                        "commands": [
+                                            "git filter-repo --path server/ecommerce-stock-management/.env --invert-paths",
+                                            "git filter-repo --path server/.env.docker --invert-paths"
+                                        ]
+                                    },
+                                    {
+                                        "task": "Update .gitignore",
+                                        "requirements": [
+                                            "Ensure .env, .env.*, *.key are ignored",
+                                            "Add docker-compose.override.yml for local secrets"
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "step": "1.2",
+                                "title": "Fix MongoDB ID Handling Globally",
+                                "goal": "Make all models consistently handle _id ↔ id conversion",
+                                "implementationSteps": [
+                                    {
+                                        "action": "Create a Trait for ID handling",
+                                        "file": "app/Traits/MongoIdHelper.php",
+                                        "purpose": [
+                                            "Automatically provide id accessor that returns _id",
+                                            "Add boot method to ensure _id is always present"
+                                        ]
+                                    },
+                                    {
+                                        "action": "Apply trait to all models",
+                                        "models": [
+                                            "Product.php",
+                                            "Category.php",
+                                            "Order.php",
+                                            "Customer.php",
+                                            "Inventory.php",
+                                            "User.php"
+                                        ]
+                                    },
+                                    {
+                                        "action": "Update all controllers",
+                                        "requirements": [
+                                            "Ensure API responses always include both _id and id fields",
+                                            "Use $product->_id in backend logic, let accessor provide id for frontend"
+                                        ]
+                                    },
+                                    {
+                                        "action": "Fix relationships",
+                                        "note": "Update foreign key references to explicitly use _id",
+                                        "example": "public function customer(): BelongsTo {\n    return $this->belongsTo(Customer::class, 'customer_id', '_id');\n}"
+                                    },
+                                    {
+                                        "action": "Add validation helper",
+                                        "requirements": [
+                                            "Create method to validate MongoDB ObjectID format",
+                                            "Prevent invalid IDs from being queried",
+                                            "Return 404 early for malformed IDs"
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "step": "1.3",
+                                "title": "Implement Global Input Sanitization",
+                                "goal": "Prevent NoSQL injection across all endpoints",
+                                "implementationSteps": [
+                                    {
+                                        "action": "Create sanitization middleware",
+                                        "file": "app/Http/Middleware/SanitizeInput.php",
+                                        "functions": [
+                                            "Strip MongoDB operators ($, {, }, $where, $regex, $ne)",
+                                            "Apply XSS prevention (htmlspecialchars)"
+                                        ]
+                                    },
+                                    {
+                                        "action": "Register middleware globally",
+                                        "requirements": [
+                                            "Add to api middleware group in app.php",
+                                            "Apply BEFORE authentication middleware"
+                                        ]
+                                    },
+                                    {
+                                        "action": "Create query sanitizer service",
+                                        "file": "app/Services/QuerySanitizer.php",
+                                        "usage": "Use in all controllers that accept search/filter params"
+                                    },
+                                    {
+                                        "action": "Update all search functions",
+                                        "files": [
+                                            "ProductController::index()",
+                                            "CategoryController::index()"
+                                        ],
+                                        "requirement": "Use sanitizer before building queries"
+                                    },
+                                    {
+                                        "action": "Add request validation",
+                                        "requirements": [
+                                            "Create Form Request classes for complex inputs",
+                                            "Validate data types, lengths, formats"
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "step": "1.4",
+                                "title": "Add Rate Limiting to Auth Endpoints",
+                                "goal": "Prevent brute force attacks",
+                                "implementationSteps": [
+                                    {
+                                        "action": "Configure rate limits",
+                                        "file": "RouteServiceProvider.php",
+                                        "limits": {
+                                            "login": "5 attempts per minute per IP",
+                                            "register": "3 attempts per minute per IP",
+                                            "passwordReset": "2 attempts per minute per IP"
+                                        }
+                                    },
+                                    {
+                                        "action": "Apply to routes",
+                                        "file": "api.php",
+                                        "example": "Route::middleware('throttle:auth')->group(function () {\n    // All auth routes here\n});"
+                                    },
+                                    {
+                                        "action": "Add custom rate limit responses",
+                                        "requirements": [
+                                            "Return consistent JSON errors",
+                                            "Include Retry-After header"
+                                        ]
+                                    },
+                                    {
+                                        "action": "Implement account lockout",
+                                        "requirements": [
+                                            "Track failed login attempts in Redis",
+                                            "Lock account for 15 minutes after 5 failures",
+                                            "Send email notification on lockout"
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "step": "1.5",
+                                "title": "Secure File Uploads",
+                                "goal": "Prevent malicious file uploads",
+                                "implementationSteps": [
+                                    {
+                                        "action": "Update Product.php::uploadImage()",
+                                        "requirements": [
+                                            "Add MIME type whitelist: image/jpeg, image/png, image/webp, image/gif",
+                                            "Validate using getMimeType() not file extension",
+                                            "Enforce max file size: 5MB",
+                                            "Validate image dimensions (min: 100x100, max: 4000x4000)"
+                                        ]
+                                    },
+                                    {
+                                        "action": "Generate secure random filenames",
+                                        "method": "Use: bin2hex(random_bytes(32)) instead of timestamp",
+                                        "requirement": "Remove predictable patterns"
+                                    },
+                                    {
+                                        "action": "Add image validation service",
+                                        "file": "app/Services/ImageValidator.php",
+                                        "requirements": [
+                                            "Check file header bytes (magic numbers)",
+                                            "Reject files with embedded PHP code"
+                                        ]
+                                    },
+                                    {
+                                        "action": "Implement virus scanning (if possible)",
+                                        "requirements": [
+                                            "Integrate ClamAV or similar",
+                                            "Scan before S3 upload",
+                                            "Quarantine suspicious files"
+                                        ]
+                                    },
+                                    {
+                                        "action": "Set strict S3 bucket permissions",
+                                        "requirements": [
+                                            "Update bucket policy: no execute permissions",
+                                            "Set Content-Type header on upload",
+                                            "Enable S3 virus scanning (AWS GuardDuty)"
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "phase": 2,
+                        "title": "Authentication Hardening (WEEK 1-2)",
+                        "steps": [
+                            {
+                                "step": "2.1",
+                                "title": "Implement JWT Token Blacklist",
+                                "goal": "Actually invalidate tokens on logout",
+                                "implementationSteps": [
+                                    {
+                                        "action": "Create blacklist model",
+                                        "file": "app/Models/JwtBlacklist.php",
+                                        "collection": "jwt_blacklist",
+                                        "fields": [
+                                            "token (hash)",
+                                            "expires_at (TTL)"
+                                        ]
+                                    },
+                                    {
+                                        "action": "Update logout endpoint",
+                                        "file": "JWTAuthController::logout()",
+                                        "requirements": [
+                                            "Add token to blacklist before invalidating",
+                                            "Set expiration to match JWT TTL"
+                                        ]
+                                    },
+                                    {
+                                        "action": "Check blacklist in middleware",
+                                        "file": "JWTMiddleware.php",
+                                        "requirements": [
+                                            "Query blacklist before authenticating user",
+                                            "Return TOKEN_BLACKLISTED error if found"
+                                        ]
+                                    },
+                                    {
+                                        "action": "Add cleanup job",
+                                        "requirements": [
+                                            "Create artisan command to delete expired tokens",
+                                            "Schedule to run daily via cron"
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "step": "2.2",
+                                "title": "Implement Refresh Token Rotation",
+                                "goal": "Prevent token replay attacks",
+                                "implementationSteps": [
+                                    {
+                                        "action": "Update refresh logic",
+                                        "file": "JWTAuthController::refresh()",
+                                        "requirements": [
+                                            "Blacklist old token immediately",
+                                            "Generate new token pair (access + refresh)",
+                                            "Add short grace period (5 minutes) to prevent race conditions"
+                                        ]
+                                    },
+                                    {
+                                        "action": "Track refresh history",
+                                        "requirements": [
+                                            "Store token lineage in token_refresh_history collection",
+                                            "Detect suspicious refresh patterns (e.g., same token refreshed from multiple IPs)"
+                                        ]
+                                    },
+                                    {
+                                        "action": "Add frontend token management",
+                                        "requirements": [
+                                            "Store refresh token separately",
+                                            "Auto-refresh 5 minutes before expiry",
+                                            "Handle refresh failures gracefully"
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "step": "2.3",
+                                "title": "Add Password Security Measures",
+                                "implementationSteps": [
+                                    {
+                                        "action": "Enforce password complexity",
+                                        "requirements": [
+                                            "Minimum 8 characters",
+                                            "Require: uppercase, lowercase, number, special char",
+                                            "Block common passwords (use dictionary)"
+                                        ]
+                                    },
+                                    {
+                                        "action": "Hash passwords securely",
+                                        "requirements": [
+                                            "Verify using bcrypt (already in use)",
+                                            "Set rounds: 12 (good balance)",
+                                            "Never log passwords (even hashed)"
+                                        ]
+                                    },
+                                    {
+                                        "action": "Implement password reset",
+                                        "requirements": [
+                                            "Generate secure token (60 chars random)",
+                                            "Store hash in password_resets collection with expiry",
+                                            "Send email with one-time link",
+                                            "Invalidate after use"
+                                        ]
+                                    },
+                                    {
+                                        "action": "Add password history",
+                                        "requirements": [
+                                            "Store hashes of last 5 passwords",
+                                            "Prevent reuse"
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "phase": 3,
+                        "title": "Data Security & Validation (WEEK 2-3)",
+                        "steps": [
+                            {
+                                "step": "3.1",
+                                "title": "Fix All Relationship ID References",
+                                "implementationSteps": [
+                                    {
+                                        "action": "Audit all relationships",
+                                        "requirement": "Search codebase for belongsTo(), hasMany(), hasOne() - Ensure all use _id as foreign key"
+                                    },
+                                    {
+                                        "action": "Update affected models",
+                                        "models": [
+                                            "Order.php: Already correct (customer_id → _id)",
+                                            "Inventory.php: Verify product_id references",
+                                            "Customer.php: Check user_id linkage"
+                                        ]
+                                    },
+                                    {
+                                        "action": "Add relationship validation",
+                                        "requirement": "Before saving, verify referenced document exists",
+                                        "example": "static::saving(function ($inventory) {\n    if (!Product::where('_id', $inventory->product_id)->exists()) {\n        throw new Exception('Invalid product_id');\n    }\n});"
+                                    },
+                                    {
+                                        "action": "Create referential integrity checks",
+                                        "requirements": [
+                                            "Add database-level constraints where possible",
+                                            "Use transactions for multi-collection operations"
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "step": "3.2",
+                                "title": "Implement Request Validation Layer",
+                                "implementationSteps": [
+                                    {
+                                        "action": "Create Form Request classes",
+                                        "classes": [
+                                            "ProductStoreRequest",
+                                            "ProductUpdateRequest",
+                                            "CategoryStoreRequest",
+                                            "CategoryUpdateRequest",
+                                            "OrderStoreRequest"
+                                        ],
+                                        "requirement": "Define all validation rules"
+                                    },
+                                    {
+                                        "action": "Use in controllers",
+                                        "requirements": [
+                                            "Replace manual validation with Form Requests",
+                                            "Automatically returns 422 with errors"
+                                        ]
+                                    },
+                                    {
+                                        "action": "Add custom validation rules",
+                                        "rules": [
+                                            "ValidMongoId: Check ObjectID format",
+                                            "ImageValidation: Check file type and size",
+                                            "UniqueCategorySlug: Prevent duplicates"
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "step": "3.3",
+                                "title": "Database Query Security",
+                                "implementationSteps": [
+                                    {
+                                        "action": "Always use parameterized queries",
+                                        "requirements": [
+                                            "Never concatenate user input",
+                                            "Use Eloquent ORM methods (already doing this)"
+                                        ]
+                                    },
+                                    {
+                                        "action": "Add query logging in development",
+                                        "requirements": [
+                                            "Enable MongoDB query logging",
+                                            "Monitor slow queries"
+                                        ]
+                                    },
+                                    {
+                                        "action": "Implement query result limits",
+                                        "requirements": [
+                                            "Cap pagination at 100 items per page",
+                                            "Prevent memory exhaustion attacks"
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "phase": 4,
+                        "title": "Infrastructure Security (WEEK 3-4)",
+                        "steps": [
+                            {
+                                "step": "4.1",
+                                "title": "Docker Hardening",
+                                "implementationSteps": [
+                                    {
+                                        "action": "Run as non-root user",
+                                        "file": "Dockerfile",
+                                        "requirements": [
+                                            "Create appuser with UID 1000",
+                                            "Run PHP-FPM as appuser",
+                                            "Set ownership of files"
+                                        ]
+                                    },
+                                    {
+                                        "action": "Remove unnecessary tools",
+                                        "requirements": [
+                                            "Delete shells not needed (/bin/sh, /bin/bash)",
+                                            "Remove package managers after install"
+                                        ]
+                                    },
+                                    {
+                                        "action": "Add security options",
+                                        "file": "docker-compose.yml",
+                                        "requirements": [
+                                            "Add no-new-privileges: true",
+                                            "Set read-only root filesystem where possible",
+                                            "Drop kernel capabilities"
+                                        ]
+                                    },
+                                    {
+                                        "action": "Isolate Redis",
+                                        "requirements": [
+                                            "Don't expose port 6379 externally",
+                                            "Only allow connections from laravel service via internal network"
+                                        ]
+                                    },
+                                    {
+                                        "action": "Add health checks",
+                                        "checks": [
+                                            "Laravel: Check /api/health endpoint",
+                                            "Redis: redis-cli ping",
+                                            "Auto-restart on failure"
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "step": "4.2",
+                                "title": "Use Docker Secrets for Production",
+                                "implementationSteps": [
+                                    {
+                                        "action": "Create secrets directory",
+                                        "files": [
+                                            "db_dsn.txt",
+                                            "jwt_secret.txt",
+                                            "aws_key.txt"
+                                        ],
+                                        "requirement": "Add to .gitignore"
+                                    },
+                                    {
+                                        "action": "Update docker-compose.yml",
+                                        "requirements": [
+                                            "Define secrets section",
+                                            "Mount secrets as files in /run/secrets/"
+                                        ]
+                                    },
+                                    {
+                                        "action": "Update Laravel config",
+                                        "requirements": [
+                                            "Modify database.php to read from secrets",
+                                            "Fallback to env vars for local development"
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "step": "4.3",
+                                "title": "Environment Segregation",
+                                "implementationSteps": [
+                                    {
+                                        "action": "Create separate env files",
+                                        "files": [
+                                            ".env.local (development)",
+                                            ".env.staging (testing)",
+                                            ".env.production (production)"
+                                        ],
+                                        "requirement": "Use .env.example as template"
+                                    },
+                                    {
+                                        "action": "Never commit actual env files",
+                                        "requirements": [
+                                            "Update .gitignore",
+                                            "Use secret management tools (AWS Secrets Manager, HashiCorp Vault)"
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "phase": 5,
+                        "title": "Monitoring & Auditing (WEEK 4)",
+                        "steps": [
+                            {
+                                "step": "5.1",
+                                "title": "Implement Audit Logging",
+                                "implementationSteps": [
+                                    {
+                                        "action": "Create audit log model",
+                                        "file": "app/Models/AuditLog.php",
+                                        "fields": [
+                                            "user_id",
+                                            "action",
+                                            "model",
+                                            "model_id",
+                                            "old_values",
+                                            "new_values",
+                                            "ip",
+                                            "user_agent",
+                                            "timestamp"
+                                        ]
+                                    },
+                                    {
+                                        "action": "Create Auditable trait",
+                                        "requirements": [
+                                            "Auto-log all created, updated, deleted events",
+                                            "Apply to sensitive models: Product, Category, Order, User"
+                                        ]
+                                    },
+                                    {
+                                        "action": "Add manual logging for critical actions",
+                                        "actions": [
+                                            "Admin login/logout",
+                                            "Password resets",
+                                            "Role changes",
+                                            "Bulk operations"
+                                        ]
+                                    },
+                                    {
+                                        "action": "Create audit viewer",
+                                        "requirements": [
+                                            "Admin dashboard page to view logs",
+                                            "Filter by user, date, action",
+                                            "Export to CSV"
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "step": "5.2",
+                                "title": "Error Handling & Logging",
+                                "implementationSteps": [
+                                    {
+                                        "action": "Create global exception handler",
+                                        "file": "app/Exceptions/Handler.php",
+                                        "requirements": [
+                                            "Never expose stack traces in production",
+                                            "Log errors with context (user ID, request ID)"
+                                        ]
+                                    },
+                                    {
+                                        "action": "Implement structured logging",
+                                        "channels": {
+                                            "security": "Failed logins, suspicious activity",
+                                            "database": "Query errors",
+                                            "application": "General errors"
+                                        }
+                                    },
+                                    {
+                                        "action": "Set up log rotation",
+                                        "requirements": [
+                                            "Daily log files",
+                                            "Compress old logs",
+                                            "Delete logs older than 30 days"
+                                        ]
+                                    },
+                                    {
+                                        "action": "Add alerting",
+                                        "alerts": [
+                                            "Send Slack/email on critical errors",
+                                            "Notify on repeated 500 errors",
+                                            "Alert on authentication failures"
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "phase": 6,
+                        "title": "Testing & Validation (ONGOING)",
+                        "steps": [
+                            {
+                                "step": "6.1",
+                                "title": "Security Testing Checklist",
+                                "manualTests": [
+                                    {
+                                        "test": "Test NoSQL injection",
+                                        "action": "Send: ?search={\"$ne\":null}",
+                                        "expected": "Should return error, not data"
+                                    },
+                                    {
+                                        "test": "Test authentication bypass",
+                                        "actions": [
+                                            "Try accessing admin routes without token",
+                                            "Try with expired token",
+                                            "Try with blacklisted token"
+                                        ]
+                                    },
+                                    {
+                                        "test": "Test file upload exploits",
+                                        "actions": [
+                                            "Upload PHP file disguised as JPG",
+                                            "Upload oversized file (>5MB)",
+                                            "Upload file with executable extension"
+                                        ]
+                                    },
+                                    {
+                                        "test": "Test rate limiting",
+                                        "action": "Send 10 login requests rapidly",
+                                        "expected": "Should block after 5th attempt"
+                                    },
+                                    {
+                                        "test": "Test CORS",
+                                        "action": "Send request from unauthorized origin",
+                                        "expected": "Should reject"
+                                    }
+                                ]
+                            },
+                            {
+                                "step": "6.2",
+                                "title": "Automated Security Scans",
+                                "tools": [
+                                    {
+                                        "category": "Dependency scanning",
+                                        "tool": "composer audit",
+                                        "purpose": "Check for known vulnerabilities in packages"
+                                    },
+                                    {
+                                        "category": "Code analysis",
+                                        "tools": "PHPStan or Psalm",
+                                        "purpose": "Check for type safety issues"
+                                    },
+                                    {
+                                        "category": "Secret scanning",
+                                        "tools": "truffleHog or gitleaks",
+                                        "purpose": "Scan git history for leaked credentials"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    "prioritySummary": {
+        "doImmediately": [
+            "Revoke exposed AWS credentials",
+            "Rotate MongoDB password",
+            "Generate new JWT secret",
+            "Remove secrets from git",
+            "Fix MongoDB ID handling (trait)"
+        ],
+        "doThisWeek": [
+            "Implement input sanitization",
+            "Add rate limiting",
+            "Secure file uploads",
+            "Implement JWT blacklist"
+        ],
+        "doNextWeek": [
+            "Refresh token rotation",
+            "Fix all relationship IDs",
+            "Add audit logging"
+        ],
+        "doBeforeProduction": [
+            "Docker security hardening",
+            "Use Docker secrets",
+            "Comprehensive testing"
+        ]
+    },
+    "estimatedTimeline": {
+        "emergencyFixes": "1-2 days",
+        "authenticationHardening": "3-4 days",
+        "dataSecurity": "3-4 days",
+        "infrastructure": "2-3 days",
+        "monitoring": "2-3 days",
+        "testing": "2-3 days",
+        "total": "15-20 working days (3-4 weeks)"
+    }
+}

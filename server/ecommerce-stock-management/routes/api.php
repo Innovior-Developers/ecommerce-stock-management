@@ -26,9 +26,9 @@ Route::get('/test', function () {
 Route::prefix('auth')->group(function () {
     Route::post('/admin/login', [JWTAuthController::class, 'adminLogin']);
     Route::post('/customer/login', [JWTAuthController::class, 'customerLogin']);
-    Route::post('/customer/register', [JWTAuthController::class, 'customerRegister']);
+    Route::post('/customer/register', [JWTAuthController::class, 'customerRegister']); // ✅ Make sure this exists
 
-    // Protected auth routes (require token)
+    // Protected auth routes
     Route::middleware('jwt.auth')->group(function () {
         Route::get('/user', [JWTAuthController::class, 'me']);
         Route::post('/logout', [JWTAuthController::class, 'logout']);

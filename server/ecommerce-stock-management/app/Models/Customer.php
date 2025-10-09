@@ -10,41 +10,34 @@ class Customer extends Model
     protected $connection = 'mongodb';
     protected $collection = 'customers';
 
+    // ✅ These properties are the ONLY correct way to handle MongoDB IDs
+    protected $primaryKey = '_id';
+    protected $keyType = 'string';
+    public $incrementing = false;
+
     protected $fillable = [
         'user_id',
         'first_name',
         'last_name',
         'phone',
-        'date_of_birth',
-        'gender',
-        'addresses',
-        'preferences',
         'marketing_consent',
-        'created_at',
-        'updated_at',
     ];
 
     protected $casts = [
-        'addresses' => 'array',
-        'preferences' => 'array',
+        '_id' => 'string',
+        'user_id' => 'string',
         'marketing_consent' => 'boolean',
-        'date_of_birth' => 'date',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
 
     public function user()
     {
-        return $this->belongsTo(User::class, 'user_id');
+        return $this->belongsTo(User::class, 'user_id', '_id');
     }
 
     public function orders(): HasMany
     {
-        return $this->hasMany(Order::class, 'customer_id');
-    }
-
-    public function getFullNameAttribute()
-    {
-        return $this->first_name . ' ' . $this->last_name;
+        return $this->hasMany(Order::class, 'customer_id', '_id');
     }
 }

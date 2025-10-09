@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use MongoDB\Laravel\Eloquent\Model;
+use App\Traits\MongoIdHelper;
 
 class Category extends Model
 {
+    use MongoIdHelper; // ✅ Add this trait
+
     protected $connection = 'mongodb';
     protected $collection = 'categories';
 
@@ -22,24 +25,23 @@ class Category extends Model
     ];
 
     protected $casts = [
+        '_id' => 'string', // ✅ Add this
         'sort_order' => 'integer',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
 
-    // Relationship for subcategories
+    // ✅ UPDATE: Relationships with proper ID handling
     public function children()
     {
-        return $this->hasMany(Category::class, 'parent_id');
+        return $this->hasMany(Category::class, 'parent_id', '_id');
     }
 
-    // Relationship for parent category
     public function parent()
     {
-        return $this->belongsTo(Category::class, 'parent_id');
+        return $this->belongsTo(Category::class, 'parent_id', '_id');
     }
 
-    // Scope for active categories
     public function scopeActive($query)
     {
         return $query->where('status', 'active');
