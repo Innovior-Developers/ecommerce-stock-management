@@ -1,0 +1,71 @@
+root@8fae40c9e653:/var/www/html# php artisan route:list
+
+  GET|HEAD        / ........................................................................ 
+  GET|HEAD        api/admin/categories ..... categories.index › Api\CategoryController@index
+  POST            api/admin/categories ..... categories.store › Api\CategoryController@store
+  GET|HEAD        api/admin/categories/{category} categories.show › Api\CategoryController@…  
+  PUT|PATCH       api/admin/categories/{category} categories.update › Api\CategoryControlle…  
+  DELETE          api/admin/categories/{category} categories.destroy › Api\CategoryControll…  
+  GET|HEAD        api/admin/customers ....... customers.index › Api\CustomerController@index  
+  POST            api/admin/customers ....... customers.store › Api\CustomerController@store  
+  GET|HEAD        api/admin/customers/{customer} customers.show › Api\CustomerController@sh…  
+  PUT|PATCH       api/admin/customers/{customer} customers.update › Api\CustomerController@…  
+  DELETE          api/admin/customers/{customer} customers.destroy › Api\CustomerController…  
+  GET|HEAD        api/admin/inventory/low-stock ........... Api\InventoryController@lowStock  
+  GET|HEAD        api/admin/inventory/stock-levels ..... Api\InventoryController@stockLevels  
+  PUT             api/admin/inventory/{id} ............. Api\InventoryController@updateStock  
+  GET|HEAD        api/admin/orders ................ orders.index › Api\OrderController@index  
+  POST            api/admin/orders ................ orders.store › Api\OrderController@store  
+  GET|HEAD        api/admin/orders/{order} .......... orders.show › Api\OrderController@show  
+  PUT|PATCH       api/admin/orders/{order} ...... orders.update › Api\OrderController@update  
+  DELETE          api/admin/orders/{order} .... orders.destroy › Api\OrderController@destroy
+  POST            api/admin/products .......... products.store › Api\ProductController@store  
+  GET|HEAD        api/admin/products ........................... Api\ProductController@index  
+  PUT|PATCH       api/admin/products/{product} products.update › Api\ProductController@upda…  
+  DELETE          api/admin/products/{product} products.destroy › Api\ProductController@des…  
+  POST            api/auth/admin/login .................... Api\JWTAuthController@adminLogin  
+  POST            api/auth/customer/login .............. Api\JWTAuthController@customerLogin  
+  POST            api/auth/customer/register ........ Api\JWTAuthController@customerRegister  
+  POST            api/auth/logout ............................. Api\JWTAuthController@logout  
+  POST            api/auth/refresh ........................... Api\JWTAuthController@refresh  
+  GET|HEAD        api/auth/user ................................... Api\JWTAuthController@me  
+  GET|HEAD        api/categories .............................. Api\CategoryController@index  
+  PUT             api/customer/profile ................ Api\CustomerController@updateProfile  
+  GET|HEAD        api/debug-auth ...........................................................  
+  GET|HEAD        api/health ...............................................................  
+  GET|HEAD        api/products ................................. Api\ProductController@index  
+  GET|HEAD        api/products/{id} ............................. Api\ProductController@show  
+  GET|HEAD        api/test .................................................................  
+  GET|HEAD        confirm-password password.confirm › Auth\ConfirmablePasswordController@sh…  
+  POST            confirm-password ................ Auth\ConfirmablePasswordController@store  
+  GET|HEAD        dashboard ...................................................... dashboard  
+  POST            email/verification-notification verification.send › Auth\EmailVerificatio…  
+  GET|HEAD        forgot-password password.request › Auth\PasswordResetLinkController@create  
+  POST            forgot-password .. password.email › Auth\PasswordResetLinkController@store  
+  GET|HEAD        health ...................................................................  
+  GET|HEAD        livewire/livewire.js Livewire\Mechanisms › FrontendAssets@returnJavaScrip…  
+  GET|HEAD        livewire/livewire.min.js.map ... Livewire\Mechanisms › FrontendAssets@maps
+  GET|HEAD        livewire/preview-file/{filename} livewire.preview-file › Livewire\Feature…  
+  POST            livewire/update livewire.update › Livewire\Mechanisms › HandleRequests@ha…  
+  POST            livewire/upload-file livewire.upload-file › Livewire\Features › FileUploa…  
+  GET|HEAD        login ................. login › Auth\AuthenticatedSessionController@create  
+  POST            login .......................... Auth\AuthenticatedSessionController@store  
+  POST            logout .............. logout › Auth\AuthenticatedSessionController@destroy  
+  PUT             password ................ password.update › Auth\PasswordController@update  
+  GET|HEAD        profile ............................ profile.edit › ProfileController@edit  
+  PATCH           profile ........................ profile.update › ProfileController@update  
+  DELETE          profile ...................... profile.destroy › ProfileController@destroy  
+  GET|HEAD        register ................. register › Auth\RegisteredUserController@create  
+  POST            register ............................. Auth\RegisteredUserController@store  
+  POST            reset-password ......... password.store › Auth\NewPasswordController@store  
+  GET|HEAD        reset-password/{token} password.reset › Auth\NewPasswordController@create   
+  GET|HEAD        storage/{path} ............................................. storage.local  
+  GET|HEAD        test-full-stack ............................. TestController@testFullStack  
+  GET|HEAD        test-mongo ............................ TestController@testMongoConnection  
+  GET|HEAD        test-products .............................. TestController@getAllProducts  
+  GET|HEAD        test-redis ............................ TestController@testRedisConnection  
+  GET|HEAD        up .......................................................................  
+  GET|HEAD        verify-email verification.notice › Auth\EmailVerificationPromptController   
+  GET|HEAD        verify-email/{id}/{hash} verification.verify › Auth\VerifyEmailController   
+
+                                                                         Showing [67] routes  
