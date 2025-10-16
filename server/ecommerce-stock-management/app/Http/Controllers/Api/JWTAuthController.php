@@ -14,6 +14,7 @@ use Tymon\JWTAuth\Exceptions\TokenExpiredException;
 use Tymon\JWTAuth\Exceptions\TokenInvalidException;
 use App\Services\QuerySanitizer;
 use Illuminate\Support\Facades\Log;
+use App\Models\JwtBlacklist;
 
 class JWTAuthController extends Controller
 {
@@ -155,7 +156,6 @@ class JWTAuthController extends Controller
                 'success' => true,
                 'message' => 'Registration successful',
                 'user' => [
-                    'id' => (string) $user->_id,
                     'name' => $user->name,
                     'email' => $user->email,
                     'role' => $user->role,
@@ -166,7 +166,6 @@ class JWTAuthController extends Controller
                 'token_type' => 'bearer',
                 'expires_in' => config('jwt.ttl') * 60
             ], 201);
-
         } catch (ValidationException $e) {
             Log::warning('Validation failed', ['errors' => $e->errors()]);
             return response()->json([
@@ -174,7 +173,6 @@ class JWTAuthController extends Controller
                 'message' => 'Validation failed',
                 'errors' => $e->errors()
             ], 422);
-
         } catch (\Exception $e) {
             Log::error('Registration error:', [
                 'message' => $e->getMessage(),
@@ -190,8 +188,9 @@ class JWTAuthController extends Controller
 
     /**
      * Get the authenticated User
+     * ✅ CHANGED: Renamed from me() to user() to match route
      */
-    public function me()
+    public function user()
     {
         try {
             $user = JWTAuth::parseToken()->authenticate();
@@ -240,7 +239,28 @@ class JWTAuthController extends Controller
     public function logout()
     {
         try {
-            JWTAuth::invalidate(JWTAuth::getToken());
+            $token = JWTAuth::getToken();
+
+            if (!$token) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No token provided'
+                ], 400);
+            }
+
+            // Get user before invalidating
+            $user = JWTAuth::parseToken()->authenticate();
+
+            // Add to blacklist BEFORE invalidating
+            JwtBlacklist::add(
+                $token->get(),
+                config('jwt.ttl'),
+                $user ? (string) $user->_id : null,
+                'user_logout'
+            );
+
+            // Invalidate the token
+            JWTAuth::invalidate($token);
 
             return response()->json([
                 'success' => true,
@@ -249,7 +269,7 @@ class JWTAuthController extends Controller
         } catch (JWTException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to logout, please try again.'
+                'message' => 'Failed to logout: ' . $e->getMessage()
             ], 500);
         }
     }

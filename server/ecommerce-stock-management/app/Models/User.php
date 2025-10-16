@@ -6,15 +6,17 @@ use MongoDB\Laravel\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Tymon\JWTAuth\Contracts\JWTSubject;
 use Illuminate\Support\Facades\Hash;
+use App\Traits\MongoIdHelper; // ✅ Add this import
 
 class User extends Authenticatable implements JWTSubject
 {
     use Notifiable;
+    use MongoIdHelper; // ✅ Add this trait
 
     protected $connection = 'mongodb';
     protected $collection = 'users';
 
-    // ✅ These properties are the ONLY correct way to handle MongoDB IDs
+    // ✅ These properties are already correct
     protected $primaryKey = '_id';
     protected $keyType = 'string';
     public $incrementing = false;
@@ -40,7 +42,7 @@ class User extends Authenticatable implements JWTSubject
     ];
 
     /**
-     * Auto-hash password on save. This is crucial for User::create().
+     * Auto-hash password on save
      */
     public function setPasswordAttribute($value)
     {
@@ -49,6 +51,7 @@ class User extends Authenticatable implements JWTSubject
         }
     }
 
+    // JWT methods
     public function getJWTIdentifier()
     {
         return $this->getKey();

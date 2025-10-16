@@ -32,8 +32,6 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-require __DIR__.'/auth.php';
-
 // Test routes
 Route::get('/test-mongo', [TestController::class, 'testMongoConnection']);
 Route::get('/test-redis', [TestController::class, 'testRedisConnection']);

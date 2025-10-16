@@ -12,7 +12,8 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // $schedule->command('inspire')->hourly();
+        // Clean up expired blacklisted tokens daily at 2 AM
+        $schedule->command('jwt:cleanup-blacklist')->dailyAt('02:00');
     }
 
     /**

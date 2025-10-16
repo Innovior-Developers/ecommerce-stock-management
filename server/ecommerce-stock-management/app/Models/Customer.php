@@ -4,13 +4,16 @@ namespace App\Models;
 
 use MongoDB\Laravel\Eloquent\Model;
 use MongoDB\Laravel\Relations\HasMany;
+use App\Traits\MongoIdHelper; // ✅ Add this import
 
 class Customer extends Model
 {
+    use MongoIdHelper; // ✅ Add this trait
+
     protected $connection = 'mongodb';
     protected $collection = 'customers';
 
-    // ✅ These properties are the ONLY correct way to handle MongoDB IDs
+    // ✅ These properties are already correct
     protected $primaryKey = '_id';
     protected $keyType = 'string';
     public $incrementing = false;

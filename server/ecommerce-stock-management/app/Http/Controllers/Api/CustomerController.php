@@ -11,6 +11,9 @@ use App\Services\QuerySanitizer;
 
 class CustomerController extends Controller
 {
+    /**
+     * ✅ SECURED: List customers (admin only - verified by middleware)
+     */
     public function index(Request $request)
     {
         try {
@@ -31,29 +34,17 @@ class CustomerController extends Controller
 
             $customers = $query->orderBy('created_at', 'desc')->get();
 
+            // ✅ SECURE: Don't send IDs to frontend
             $customersData = $customers->map(function ($customer) {
                 return [
-                    '_id' => $customer->_id,
-                    'id' => $customer->_id,
-                    'user_id' => $customer->user_id,
                     'first_name' => $customer->first_name,
                     'last_name' => $customer->last_name,
                     'phone' => $customer->phone,
-                    'date_of_birth' => $customer->date_of_birth,
-                    'gender' => $customer->gender,
-                    'addresses' => $customer->addresses,
-                    'preferences' => $customer->preferences,
-                    'marketing_consent' => $customer->marketing_consent,
+                    'email' => $customer->user ? $customer->user->email : null,
+                    'status' => $customer->user ? $customer->user->status : null,
                     'created_at' => $customer->created_at,
                     'updated_at' => $customer->updated_at,
-                    'user' => $customer->user ? [
-                        '_id' => $customer->user->_id,
-                        'id' => $customer->user->_id,
-                        'name' => $customer->user->name,
-                        'email' => $customer->user->email,
-                        'role' => $customer->user->role,
-                        'status' => $customer->user->status,
-                    ] : null,
+                    'orders_count' => $customer->orders ? $customer->orders->count() : 0,
                 ];
             });
 
@@ -70,6 +61,9 @@ class CustomerController extends Controller
         }
     }
 
+    /**
+     * ✅ SECURED: Show specific customer (admin only)
+     */
     public function show($id)
     {
         try {
@@ -93,15 +87,14 @@ class CustomerController extends Controller
                 ], 404);
             }
 
+            // ✅ SECURE: Don't send IDs
             return response()->json([
                 'success' => true,
                 'data' => [
-                    '_id' => $customer->_id,
-                    'id' => $customer->_id,
-                    'user_id' => $customer->user_id,
                     'first_name' => $customer->first_name,
                     'last_name' => $customer->last_name,
                     'phone' => $customer->phone,
+                    'email' => $customer->user ? $customer->user->email : null,
                     'date_of_birth' => $customer->date_of_birth,
                     'gender' => $customer->gender,
                     'addresses' => $customer->addresses,
@@ -109,12 +102,6 @@ class CustomerController extends Controller
                     'marketing_consent' => $customer->marketing_consent,
                     'created_at' => $customer->created_at,
                     'updated_at' => $customer->updated_at,
-                    'user' => $customer->user ? [
-                        '_id' => $customer->user->_id,
-                        'id' => $customer->user->_id,
-                        'name' => $customer->user->name,
-                        'email' => $customer->user->email,
-                    ] : null,
                     'orders_count' => $customer->orders ? $customer->orders->count() : 0,
                 ],
             ]);
@@ -127,6 +114,79 @@ class CustomerController extends Controller
         }
     }
 
+    /**
+     * ✅ SECURED: Update customer profile (customer updates their own profile)
+     */
+    public function updateProfile(Request $request)
+    {
+        try {
+            // ✅ Get authenticated user from JWT token (not from request body)
+            $user = $request->user();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not authenticated',
+                ], 401);
+            }
+
+            // ✅ Backend uses user ID from token (secure)
+            $userId = QuerySanitizer::sanitizeMongoId($user->_id);
+            $customer = Customer::where('user_id', $userId)->first();
+
+            if (!$customer) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Customer profile not found',
+                ], 404);
+            }
+
+            $validated = $request->validate([
+                'first_name' => 'sometimes|string|max:255',
+                'last_name' => 'sometimes|string|max:255',
+                'phone' => 'nullable|string|max:20',
+                'date_of_birth' => 'nullable|date',
+                'gender' => 'nullable|in:male,female,other',
+                'addresses' => 'nullable|array',
+                'preferences' => 'nullable|array',
+                'marketing_consent' => 'boolean',
+            ]);
+
+            // ✅ Sanitize inputs
+            if (isset($validated['first_name'])) {
+                $validated['first_name'] = QuerySanitizer::sanitize($validated['first_name']);
+            }
+            if (isset($validated['last_name'])) {
+                $validated['last_name'] = QuerySanitizer::sanitize($validated['last_name']);
+            }
+            if (isset($validated['phone'])) {
+                $validated['phone'] = QuerySanitizer::sanitize($validated['phone']);
+            }
+
+            $customer->update($validated);
+
+            // ✅ SECURE: Don't send IDs back
+            return response()->json([
+                'success' => true,
+                'message' => 'Profile updated successfully',
+                'data' => [
+                    'first_name' => $customer->first_name,
+                    'last_name' => $customer->last_name,
+                    'phone' => $customer->phone,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error updating profile: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update profile'
+            ], 500);
+        }
+    }
+
+    /**
+     * ✅ SECURED: Admin updates customer (admin only)
+     */
     public function update(Request $request, $id)
     {
         try {
@@ -159,6 +219,7 @@ class CustomerController extends Controller
                 'marketing_consent' => 'boolean',
             ]);
 
+            // ✅ Sanitize inputs
             if (isset($validated['first_name'])) {
                 $validated['first_name'] = QuerySanitizer::sanitize($validated['first_name']);
             }
@@ -174,12 +235,11 @@ class CustomerController extends Controller
             Cache::forget("customer_{$sanitizedId}");
             Cache::flush();
 
+            // ✅ SECURE: Don't send IDs
             return response()->json([
                 'success' => true,
                 'message' => 'Customer updated successfully',
                 'data' => [
-                    '_id' => $customer->_id,
-                    'id' => $customer->_id,
                     'first_name' => $customer->first_name,
                     'last_name' => $customer->last_name,
                     'phone' => $customer->phone,
@@ -195,71 +255,9 @@ class CustomerController extends Controller
         }
     }
 
-    public function updateProfile(Request $request)
-    {
-        try {
-            $user = $request->user();
-
-            if (!$user) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'User not authenticated',
-                ], 401);
-            }
-
-            $userId = QuerySanitizer::sanitizeMongoId($user->_id);
-            $customer = Customer::where('user_id', $userId)->first();
-
-            if (!$customer) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Customer profile not found',
-                ], 404);
-            }
-
-            $validated = $request->validate([
-                'first_name' => 'sometimes|string|max:255',
-                'last_name' => 'sometimes|string|max:255',
-                'phone' => 'nullable|string|max:20',
-                'date_of_birth' => 'nullable|date',
-                'gender' => 'nullable|in:male,female,other',
-                'addresses' => 'nullable|array',
-                'preferences' => 'nullable|array',
-                'marketing_consent' => 'boolean',
-            ]);
-
-            if (isset($validated['first_name'])) {
-                $validated['first_name'] = QuerySanitizer::sanitize($validated['first_name']);
-            }
-            if (isset($validated['last_name'])) {
-                $validated['last_name'] = QuerySanitizer::sanitize($validated['last_name']);
-            }
-            if (isset($validated['phone'])) {
-                $validated['phone'] = QuerySanitizer::sanitize($validated['phone']);
-            }
-
-            $customer->update($validated);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Profile updated successfully',
-                'data' => [
-                    '_id' => $customer->_id,
-                    'id' => $customer->_id,
-                    'first_name' => $customer->first_name,
-                    'last_name' => $customer->last_name,
-                    'phone' => $customer->phone,
-                ],
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Error updating profile: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to update profile'
-            ], 500);
-        }
-    }
-
+    /**
+     * ✅ SECURED: Delete customer (admin only)
+     */
     public function destroy($id)
     {
         try {

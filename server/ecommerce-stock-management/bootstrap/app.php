@@ -12,17 +12,20 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // API middleware configuration
+        // ✅ API middleware (for /api/* routes)
         $middleware->api(prepend: [
+            \App\Http\Middleware\SanitizeInput::class,      // ✅ Input sanitization
             \App\Http\Middleware\TrustProxies::class,
-            \Illuminate\Http\Middleware\HandleCors::class,
+            \Illuminate\Http\Middleware\HandleCors::class,  // ✅ CORS handling
         ]);
 
-        // Middleware aliases
+        // ✅ Middleware aliases
         $middleware->alias([
             'jwt.auth' => \App\Http\Middleware\JWTMiddleware::class,
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
         ]);
+
+        // ❌ DO NOT add session, CSRF, or cookie middleware for API
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

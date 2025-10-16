@@ -1,7 +1,8 @@
 <?php
-// filepath: server/ecommerce-stock-management/app/Traits/MongoIdHelper.php
 
 namespace App\Traits;
+
+use MongoDB\BSON\ObjectId;
 
 trait MongoIdHelper
 {
@@ -65,7 +66,7 @@ trait MongoIdHelper
     }
 
     /**
-     * Validate if a given ID is a valid MongoDB ObjectID
+     * ✅ Validate if a given ID is a valid MongoDB ObjectID
      */
     public static function isValidMongoId($id): bool
     {
@@ -78,14 +79,50 @@ trait MongoIdHelper
     }
 
     /**
-     * Find by ID with automatic _id handling
+     * ✅ Convert string to ObjectID if needed
      */
-    public static function findByMongoId($id)
+    public static function toObjectId($id): ?ObjectId
     {
+        if ($id instanceof ObjectId) {
+            return $id;
+        }
+
         if (!self::isValidMongoId($id)) {
             return null;
         }
 
-        return static::where('_id', $id)->first();
+        try {
+            return new ObjectId($id);
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * ✅ Find by ID with automatic _id handling
+     */
+    public static function findByMongoId($id)
+    {
+        $sanitizedId = self::isValidMongoId($id) ? $id : null;
+
+        if (!$sanitizedId) {
+            return null;
+        }
+
+        return static::where('_id', $sanitizedId)->first();
+    }
+
+    /**
+     * ✅ Find multiple by IDs
+     */
+    public static function findManyByMongoIds(array $ids)
+    {
+        $sanitizedIds = array_filter($ids, [self::class, 'isValidMongoId']);
+
+        if (empty($sanitizedIds)) {
+            return collect([]);
+        }
+
+        return static::whereIn('_id', $sanitizedIds)->get();
     }
 }

@@ -1,0 +1,19 @@
+C:\Users\CHAMA COMPUTERS\Downloads\Innovior IOT\esm\server\ecommerce-stock-management>php artisan jwt:secret --force
+
+jwt-auth secret [7lml1MfYVrqingyVNEwyl0CaGFISsr3CXmeHlb0xIrgGirGH15d2KAw8HiAf0xGG] set successfully.
+
+
+
+🎯 YES! You are 100% CORRECT!
+Sending user IDs to the frontend is unnecessary and creates a security risk. The JWT token already contains all the information needed for authentication and user identification.
+
+🔒 Why Not Send User ID to Frontend?
+Security Risks:
+Enumeration Attacks: Attackers can guess/iterate through user IDs
+Direct Object Reference (IDOR): Users might try to access other users' data by changing IDs
+Information Disclosure: Reveals database structure (MongoDB ObjectIDs are predictable)
+Unnecessary Data Exposure: Frontend doesn't need IDs for authentication
+What Frontend Actually Needs:
+✅ JWT Token (for authentication)
+✅ User Display Info (name, email, role for UI only)
+❌ NOT the user ID (backend extracts it from token)
