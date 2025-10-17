@@ -64,6 +64,7 @@ import { CategoriesDebug } from "@/components/CategoriesDebug";
 import { Category } from "../types"; // ✅ Import the new type
 import ProductDetail from "@/components/admin forms/ProductDetail";
 import CategoryDetail from "@/components/admin forms/CategoryDetail";
+import { normalizeMongoId } from "@/utils/normalizeMongoId";
 
 // At the top of the file, update the type
 interface Product {
@@ -309,6 +310,15 @@ const AdminDashboard = () => {
         .includes(customerSearch.toLowerCase())
   );
 
+  // ✅ ADD THIS: Filter categories
+  const filteredCategories = categories.filter(
+    (category: unknown) =>
+      category?.name?.toLowerCase().includes(categorySearch.toLowerCase()) ||
+      category?.description
+        ?.toLowerCase()
+        .includes(categorySearch.toLowerCase())
+  );
+
   // Calculate dashboard stats
   const dashboardStats = [
     {
@@ -391,6 +401,17 @@ const AdminDashboard = () => {
     setIsCategoryDetailOpen(true);
   };
 
+  // ✅ Generate safe unique keys
+  const getProductKey = (product: unknown, index: number): string => {
+    const id = normalizeMongoId(product._id) || normalizeMongoId(product.id);
+    return id || `product-${index}`;
+  };
+
+  const getCategoryKey = (category: unknown, index: number): string => {
+    const id = normalizeMongoId(category._id) || normalizeMongoId(category.id);
+    return id || `category-${index}`;
+  };
+
   return (
     <div className="min-h-screen bg-muted/30">
       <Header isAdmin={true} />
@@ -411,12 +432,8 @@ const AdminDashboard = () => {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-6">
-        <Tabs
-          value={activeTab}
-          onValueChange={setActiveTab}
-          className="space-y-6"
-        >
+      <main className="container mx-auto px-4 py-8">
+        <Tabs defaultValue="overview" className="space-y-6">
           <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="products">Products</TabsTrigger>
@@ -496,7 +513,7 @@ const AdminDashboard = () => {
                           </div>
                         </div>
                       ))
-                   ) }
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -600,25 +617,19 @@ const AdminDashboard = () => {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredProducts.map((product: unknown) => {
-                      // ✅ Debug: Log the product to see what ID fields it has
-                      console.log("🔍 Product in map:", {
-                        _id: product._id,
-                        id: product.id,
-                        name: product.name,
-                      });
+                    {filteredProducts.map((product: unknown, index: number) => {
+                      // ✅ Use safe key generation
+                      const productKey = getProductKey(product, index);
+                      const productId =
+                        normalizeMongoId(product._id) ||
+                        normalizeMongoId(product.id);
 
                       return (
                         <ProductCard
-                          key={product._id || product.id}
-                          product={product} // ✅ Make sure the whole product is passed
+                          key={productKey}
+                          product={product}
                           onEdit={(product) => {
-                            console.log("✏️ Edit clicked for product:", {
-                              _id: product._id,
-                              id: product.id,
-                              name: product.name,
-                            });
-                            setSelectedProduct(product); // ✅ Store the complete product
+                            setSelectedProduct(product);
                             setIsEditProductOpen(true);
                           }}
                           onDelete={(id) => handleDeleteProduct(id)}
@@ -660,21 +671,49 @@ const AdminDashboard = () => {
               </CardHeader>
               <CardContent>
                 {categoriesLoading ? (
-                  <p>Loading categories...</p>
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                  </div>
+                ) : filteredCategories.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Tag className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-semibold">
+                      No categories found
+                    </h3>
+                    <p className="text-muted-foreground">
+                      {categorySearch
+                        ? "No categories match your search criteria."
+                        : "Get started by adding your first category."}
+                    </p>
+                    <Button
+                      onClick={() => setIsAddCategoryOpen(true)}
+                      className="mt-4"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Category
+                    </Button>
+                  </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {categories.map((category: Category) => (
-                      <CategoryCard
-                        key={category._id}
-                        category={category}
-                        onEdit={(category) => {
-                          setSelectedCategory(category);
-                          setIsEditCategoryOpen(true);
-                        }}
-                        onDelete={(id) => handleDeleteCategory(id)}
-                        onView={handleViewCategory} // ✅ FIX: Use the new handler
-                      />
-                    ))}
+                    {filteredCategories.map(
+                      (category: unknown, index: number) => {
+                        // ✅ Use safe key generation
+                        const categoryKey = getCategoryKey(category, index);
+
+                        return (
+                          <CategoryCard
+                            key={categoryKey}
+                            category={category}
+                            onEdit={(category) => {
+                              setSelectedCategory(category);
+                              setIsEditCategoryOpen(true);
+                            }}
+                            onDelete={(id) => handleDeleteCategory(id)}
+                            onView={handleViewCategory}
+                          />
+                        );
+                      }
+                    )}
                   </div>
                 )}
               </CardContent>

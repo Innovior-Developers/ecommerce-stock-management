@@ -15,6 +15,7 @@ use Tymon\JWTAuth\Exceptions\TokenInvalidException;
 use App\Services\QuerySanitizer;
 use Illuminate\Support\Facades\Log;
 use App\Models\JwtBlacklist;
+use Illuminate\Validation\Rules\Password;
 
 class JWTAuthController extends Controller
 {
@@ -90,100 +91,72 @@ class JWTAuthController extends Controller
     }
 
     /**
-     * Customer Register - DEFINITIVE FIX
+     * Customer Registration with Strong Password Validation
      */
     public function customerRegister(Request $request)
     {
-        Log::info('=== REGISTRATION START ===');
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users,email',
+            'password' => [
+                'required',
+                'string',
+                'confirmed',
+                Password::min(12)                    // ✅ Minimum 12 characters
+                    ->mixedCase()                    // ✅ At least one uppercase and lowercase
+                    ->numbers()                      // ✅ At least one number
+                    ->symbols()                      // ✅ At least one symbol
+                    ->uncompromised(),               // ✅ Not in known data breaches
+            ],
+            'password_confirmation' => 'required|string',
+            'first_name' => 'nullable|string|max:255',
+            'last_name' => 'nullable|string|max:255',
+            'phone' => 'nullable|string|max:20',
+        ], [
+            // ✅ Custom error messages
+            'password.min' => 'Password must be at least 12 characters long.',
+            'password.mixed' => 'Password must contain both uppercase and lowercase letters.',
+            'password.numbers' => 'Password must contain at least one number.',
+            'password.symbols' => 'Password must contain at least one special character.',
+            'password.uncompromised' => 'This password has been found in data breaches. Please choose a different password.',
+        ]);
 
-        try {
-            $validated = $request->validate([
-                'name' => 'required|string|max:255',
-                'email' => 'required|string|email|max:255|unique:users,email',
-                'password' => 'required|string|min:8|confirmed',
-                'first_name' => 'nullable|string|max:255',
-                'last_name' => 'nullable|string|max:255',
-                'phone' => 'nullable|string|max:20',
-            ]);
+        // ✅ Sanitize inputs
+        $validated['name'] = QuerySanitizer::sanitize($validated['name']);
+        $validated['email'] = QuerySanitizer::sanitize($validated['email']);
 
-            Log::info('Validation passed');
-
-            // ✅ BULLETPROOF FIX: Create user and immediately retrieve from DB
-            $userData = [
-                'name' => QuerySanitizer::sanitize($validated['name']),
-                'email' => QuerySanitizer::sanitize($validated['email']),
-                'password' => $validated['password'], // Mutator will hash
-                'role' => 'customer',
-                'status' => 'active',
-                'email_verified_at' => now(),
-            ];
-
-            // Step 1: Insert the user
-            User::create($userData);
-
-            // Step 2: IMMEDIATELY retrieve the user from database
-            // This ensures we have the _id that MongoDB assigned
-            $user = User::where('email', $userData['email'])->firstOrFail();
-
-            Log::info('User retrieved from database with _id:', [
-                '_id' => $user->_id,
-                'id_type' => gettype($user->_id),
-            ]);
-
-            // Step 3: Verify we have the _id
-            if (!$user->_id) {
-                Log::critical('IMPOSSIBLE: User exists in DB but _id is still null');
-                throw new \Exception('Failed to retrieve user ID after creation');
-            }
-
-            // Step 4: Create customer profile
-            $customer = Customer::create([
-                'user_id' => (string) $user->_id,
-                'first_name' => QuerySanitizer::sanitize($validated['first_name'] ?? ''),
-                'last_name' => QuerySanitizer::sanitize($validated['last_name'] ?? ''),
-                'phone' => QuerySanitizer::sanitize($validated['phone'] ?? ''),
-                'marketing_consent' => false,
-            ]);
-
-            Log::info('Customer profile created:', ['customer_id' => $customer->_id]);
-
-            // Step 5: Generate JWT token
-            $token = JWTAuth::fromUser($user);
-
-            Log::info('=== REGISTRATION SUCCESS ===');
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Registration successful',
-                'user' => [
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'role' => $user->role,
-                    'status' => $user->status,
-                    'avatar' => $user->avatar,
-                ],
-                'token' => $token,
-                'token_type' => 'bearer',
-                'expires_in' => config('jwt.ttl') * 60
-            ], 201);
-        } catch (ValidationException $e) {
-            Log::warning('Validation failed', ['errors' => $e->errors()]);
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $e->errors()
-            ], 422);
-        } catch (\Exception $e) {
-            Log::error('Registration error:', [
-                'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-            ]);
-            return response()->json([
-                'success' => false,
-                'message' => 'Registration failed: ' . $e->getMessage()
-            ], 500);
+        if (isset($validated['first_name'])) {
+            $validated['first_name'] = QuerySanitizer::sanitize($validated['first_name']);
         }
+        if (isset($validated['last_name'])) {
+            $validated['last_name'] = QuerySanitizer::sanitize($validated['last_name']);
+        }
+        if (isset($validated['phone'])) {
+            $validated['phone'] = QuerySanitizer::sanitize($validated['phone']);
+        }
+
+        // Create user
+        $user = User::create([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => $validated['password'], // ✅ Auto-hashed in User model
+            'role' => 'customer',
+            'status' => 'active',
+            'email_verified_at' => now(),
+        ]);
+
+        // Create customer profile
+        Customer::create([
+            'user_id' => $user->_id,
+            'first_name' => $validated['first_name'] ?? '',
+            'last_name' => $validated['last_name'] ?? '',
+            'phone' => $validated['phone'] ?? '',
+            'marketing_consent' => false,
+        ]);
+
+        $token = JWTAuth::fromUser($user);
+
+        return $this->respondWithToken($token, $user, 'Registration successful', 201);
     }
 
     /**
@@ -299,6 +272,99 @@ class JWTAuthController extends Controller
                 'success' => false,
                 'message' => 'Could not refresh token',
                 'error_code' => 'TOKEN_REFRESH_FAILED'
+            ], 500);
+        }
+    }
+
+    /**
+     * Update User Password
+     */
+    public function updatePassword(Request $request)
+    {
+        try {
+            $user = JWTAuth::parseToken()->authenticate();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not found'
+                ], 404);
+            }
+
+            $validated = $request->validate([
+                'current_password' => 'required|string',
+                'password' => [
+                    'required',
+                    'string',
+                    'confirmed',
+                    'different:current_password',     // ✅ New password must be different
+                    Password::min(12)
+                        ->mixedCase()
+                        ->numbers()
+                        ->symbols()
+                        ->uncompromised(),
+                ],
+                'password_confirmation' => 'required|string',
+            ], [
+                'password.min' => 'Password must be at least 12 characters long.',
+                'password.mixed' => 'Password must contain both uppercase and lowercase letters.',
+                'password.numbers' => 'Password must contain at least one number.',
+                'password.symbols' => 'Password must contain at least one special character.',
+                'password.uncompromised' => 'This password has been found in data breaches. Please choose a different password.',
+                'password.different' => 'New password must be different from current password.',
+            ]);
+
+            // Verify current password
+            if (!Hash::check($validated['current_password'], $user->password)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Current password is incorrect',
+                    'errors' => [
+                        'current_password' => ['The current password is incorrect.']
+                    ]
+                ], 422);
+            }
+
+            // Update password
+            User::where('_id', $user->_id)->update([
+                'password' => Hash::make($validated['password']),
+            ]);
+
+            // ✅ Optional: Invalidate all existing tokens and force re-login
+            // This is a security best practice after password change
+            $token = JWTAuth::getToken();
+            if ($token) {
+                JwtBlacklist::add(
+                    $token->get(),
+                    config('jwt.ttl'),
+                    (string) $user->_id,
+                    'password_change'
+                );
+            }
+
+            // Generate new token
+            $newToken = JWTAuth::fromUser($user);
+
+            Log::info('Password updated successfully', ['user_id' => $user->_id]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Password updated successfully. Please login with your new password.',
+                'token' => $newToken,
+                'token_type' => 'bearer',
+                'expires_in' => config('jwt.ttl') * 60
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Error updating password: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update password'
             ], 500);
         }
     }

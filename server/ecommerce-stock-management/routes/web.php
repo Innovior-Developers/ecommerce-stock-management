@@ -4,7 +4,7 @@ use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\TestController;
 
-// Only respond to exact root path
+// ✅ ONLY respond to GET requests to root
 Route::get('/', function () {
     return response()->json([
         'message' => 'Laravel API is running!',
@@ -13,14 +13,14 @@ Route::get('/', function () {
         'database' => config('database.default'),
         'api_endpoints' => [
             'health' => '/api/health',
-            'admin_login' => '/api/admin/login (POST)',
-            'customer_login' => '/api/customer/login (POST)',
-            'customer_register' => '/api/customer/register (POST)',
+            'admin_login' => '/api/auth/admin/login (POST)',
+            'customer_login' => '/api/auth/customer/login (POST)',
+            'customer_register' => '/api/auth/customer/register (POST)',
             'products' => '/api/products',
             'test' => '/api/test'
         ]
     ]);
-});
+})->name('home');
 
 Route::get('/dashboard', function () {
     return view('dashboard');
@@ -49,3 +49,5 @@ Route::get('/health', function() {
         ]
     ]);
 });
+
+require __DIR__.'/auth.php';

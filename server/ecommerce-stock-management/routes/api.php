@@ -45,9 +45,10 @@ Route::prefix('auth')->middleware('throttle:auth')->group(function () {
 
 // Protected auth routes (require JWT)
 Route::prefix('auth')->middleware('jwt.auth')->group(function () {
+    Route::get('/user', [JWTAuthController::class, 'user']); // ✅ FIXED: Changed from 'me' to 'user'
     Route::post('/logout', [JWTAuthController::class, 'logout']);
     Route::post('/refresh', [JWTAuthController::class, 'refresh']);
-    Route::get('/user', [JWTAuthController::class, 'user']); // ✅ FIXED: Changed from 'me' to 'user'
+    Route::put('/password', [JWTAuthController::class, 'updatePassword']); // ✅ NEW
 });
 
 // ========================================
@@ -108,3 +109,46 @@ if (config('app.env') !== 'production') {
         Route::post('/debug-refresh', [DebugController::class, 'testRefresh']);
     });
 }
+
+// ========================================
+// PAYMENT ROUTES (JWT + Payment Rate Limiting)
+// ========================================
+
+Route::prefix('payment')->middleware(['jwt.auth', 'throttle:payment'])->group(function () {
+    // ✅ Future payment routes will go here
+    Route::post('/create-intent', function () {
+        return response()->json(['message' => 'Payment route placeholder']);
+    });
+
+    Route::post('/confirm', function () {
+        return response()->json(['message' => 'Payment confirmation placeholder']);
+    });
+
+    Route::get('/status/{id}', function ($id) {
+        return response()->json(['message' => 'Payment status placeholder']);
+    });
+});
+
+// ✅ Checkout routes (less restrictive than payment processing)
+Route::prefix('checkout')->middleware(['jwt.auth', 'throttle:checkout'])->group(function () {
+    // ✅ Future checkout routes
+    Route::post('/validate', function () {
+        return response()->json(['message' => 'Checkout validation placeholder']);
+    });
+
+    Route::post('/calculate-total', function () {
+        return response()->json(['message' => 'Calculate total placeholder']);
+    });
+});
+
+// ✅ Webhook routes (NO JWT, uses webhook signature verification instead)
+Route::prefix('webhooks')->middleware('throttle:webhook')->group(function () {
+    // ✅ Future webhook routes
+    Route::post('/stripe', function () {
+        return response()->json(['message' => 'Stripe webhook placeholder']);
+    });
+
+    Route::post('/paypal', function () {
+        return response()->json(['message' => 'PayPal webhook placeholder']);
+    });
+});

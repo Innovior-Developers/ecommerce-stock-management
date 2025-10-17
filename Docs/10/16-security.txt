@@ -160,3 +160,7 @@ Before going to production, verify:
 ✅ APP_DEBUG=false in production
 ✅ All sensitive operations logged in audit_logs collection
 ✅ Docker container runs as non-root user
+
+Next step:
+Test registration and password update endpoints with weak and strong passwords to verify enforcement.
+Would you like code for custom error messages or password strength meter in the frontend?

@@ -233,7 +233,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     console.log("🔍 Form data before processing:", data);
     console.log("🔍 Product object:", product);
 
-    // ✅ Set submitting state
     setIsSubmitting(true);
 
     try {
@@ -246,14 +245,19 @@ export const ProductForm: React.FC<ProductFormProps> = ({
         }
       });
 
-      // Add new images
+      // ✅ FIX: Add new images with proper naming
       selectedFiles.forEach((file, index) => {
-        formData.append(`images[${index}]`, file);
+        console.log(`📎 Adding file ${index}:`, file.name);
+        formData.append(`images[${index}]`, file); // ✅ Correct format
       });
 
-      // For edit mode, send info about existing images to keep
+      // ✅ FIX: For edit mode, send existing images as JSON string
       if (mode === "edit" && existingImages.length > 0) {
+        console.log("📋 Existing images:", existingImages);
         formData.append("existing_images", JSON.stringify(existingImages));
+      } else if (mode === "edit") {
+        // If no existing images, explicitly send empty array
+        formData.append("existing_images", JSON.stringify([]));
       }
 
       // Add default values if missing
@@ -268,7 +272,9 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       for (const [key, value] of formData.entries()) {
         console.log(
           `  ${key}:`,
-          value instanceof File ? `File: ${value.name}` : value
+          value instanceof File
+            ? `File: ${value.name} (${value.size} bytes)`
+            : value
         );
       }
 
@@ -279,13 +285,11 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       if (mode === "edit" && productId && onUpdate) {
         console.log("✏️ Updating product with ID:", productId);
 
-        // ✅ Show loading toast
         const loadingToast = toast.loading("Updating product...");
 
         try {
-          await onUpdate(productId, formData);
+          const result = await onUpdate(productId, formData);
 
-          // ✅ Dismiss loading and show success
           toast.dismiss(loadingToast);
           toast.success("Product updated successfully! 🎉", {
             description: `${data.name} has been updated.`,
@@ -299,6 +303,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
           form.reset();
         } catch (error) {
           toast.dismiss(loadingToast);
+          console.error("❌ Update error:", error);
           toast.error("Failed to update product", {
             description: error?.message || "Please try again.",
           });
@@ -307,7 +312,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
         console.error("❌ Product ID is missing! Cannot update.", product);
         toast.error("Product ID is missing. Cannot update product.");
       } else {
-        // ✅ Show loading toast for create
+        // Create mode
         const loadingToast = toast.loading("Creating product...");
 
         try {
@@ -337,7 +342,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({
         description: "Please check your input and try again.",
       });
     } finally {
-      // ✅ Reset submitting state
       setIsSubmitting(false);
     }
   };

@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use App\Services\QuerySanitizer;
+use App\Services\ImageValidator; // ✅ ADD THIS
 
 class ProductController extends Controller
 {
@@ -128,8 +129,6 @@ class ProductController extends Controller
     public function store(Request $request)
     {
         Log::info('=== PRODUCT CREATION REQUEST START ===');
-        Log::info('Content-Type: ' . $request->header('Content-Type'));
-        Log::info('All request data (except files):', $request->except(array_keys($request->allFiles())));
 
         // Gather image files
         $imageFiles = [];
@@ -139,6 +138,21 @@ class ProductController extends Controller
             $imageFiles = is_array($allFiles['images']) ? $allFiles['images'] : [$allFiles['images']];
         } else if (isset($allFiles['image'])) {
             $imageFiles = is_array($allFiles['image']) ? $allFiles['image'] : [$allFiles['image']];
+        }
+
+        // ✅ VALIDATE images FIRST (before text validation)
+        if (!empty($imageFiles)) {
+            foreach ($imageFiles as $index => $file) {
+                $validation = ImageValidator::validate($file);
+
+                if (!$validation['valid']) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Image #{$index}: " . $validation['error'],
+                        'error_code' => 'INVALID_IMAGE'
+                    ], 422);
+                }
+            }
         }
 
         // Validate text fields
@@ -228,6 +242,13 @@ class ProductController extends Controller
                 ], 404);
             }
 
+            // ✅ ADD: Log incoming request
+            Log::info('=== PRODUCT UPDATE REQUEST START ===');
+            Log::info('Product ID: ' . $sanitizedId);
+            Log::info('Request has files: ' . ($request->hasFile('images') ? 'YES' : 'NO'));
+            Log::info('All files: ', $request->allFiles());
+            Log::info('Request data: ', $request->except(['images']));
+
             $validator = Validator::make($request->all(), [
                 'name' => 'sometimes|required|string|max:255',
                 'description' => 'sometimes|required|string',
@@ -267,29 +288,64 @@ class ProductController extends Controller
                 $validated['meta_description'] = QuerySanitizer::sanitize($validated['meta_description']);
             }
 
-            // Handle existing images
+            // ✅ FIX: Handle existing images FIRST
             if ($request->has('existing_images')) {
                 $existingImages = json_decode($request->input('existing_images'), true);
-                $product->images = $existingImages;
+                Log::info('Existing images from request:', ['count' => count($existingImages ?? [])]);
+                $product->images = $existingImages ?? [];
             }
 
+            // Remove existing_images from validated data
             unset($validated['existing_images']);
+
+            // Update product fields
             $product->fill($validated);
 
-            // Handle new images
+            // ✅ FIX: Handle NEW images properly
             if ($request->hasFile('images')) {
                 $files = $request->file('images');
+
+                // Ensure it's an array
                 if (!is_array($files)) {
                     $files = [$files];
                 }
 
+                Log::info('Processing ' . count($files) . ' new images for update');
+
+                // ✅ VALIDATE each image BEFORE upload
+                foreach ($files as $index => $file) {
+                    $validation = ImageValidator::validate($file);
+                    if (!$validation['valid']) {
+                        Log::error("Image validation failed at index {$index}: " . $validation['error']);
+                        return response()->json([
+                            'success' => false,
+                            'message' => "Image #{$index}: " . $validation['error'],
+                            'error_code' => 'INVALID_IMAGE'
+                        ], 422);
+                    }
+                }
+
+                // Get current images (either from existing_images or current DB state)
                 $currentImages = $product->images ?? [];
+                Log::info('Current images before upload:', ['count' => count($currentImages)]);
+
+                // Upload new images and merge with existing
                 $newImages = $product->uploadMultipleImages($files, $currentImages);
+
+                Log::info('Images after upload:', ['count' => count($newImages)]);
+
+                // ✅ CRITICAL: Set the images on the product
                 $product->images = $newImages;
             }
 
+            // ✅ SAVE the product
             $product->save();
 
+            Log::info('Product updated successfully');
+            Log::info('Final image count: ' . count($product->images ?? []));
+            Log::info('=== PRODUCT UPDATE REQUEST END ===');
+
+            // Clear cache
             Cache::forget("product_{$sanitizedId}");
             Cache::flush();
 
@@ -300,9 +356,10 @@ class ProductController extends Controller
             ]);
         } catch (\Exception $e) {
             Log::error('Error updating product: ' . $e->getMessage());
+            Log::error('Stack trace: ' . $e->getTraceAsString());
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update product'
+                'message' => 'Failed to update product: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -372,10 +429,28 @@ class ProductController extends Controller
                 ], 404);
             }
 
+            // ✅ UPDATED: Use ImageValidator constants
             $request->validate([
                 'images' => 'required|array|max:5',
-                'images.*' => 'image|mimes:jpeg,png,jpg,gif,webp|max:10240',
+                'images.*' => [
+                    'required',
+                    'file',
+                    'mimes:' . implode(',', ImageValidator::getAllowedExtensions()),
+                    'max:' . (ImageValidator::getMaxFileSize() / 1024), // Laravel expects KB
+                ],
             ]);
+
+            // ✅ VALIDATE each image
+            foreach ($request->file('images') as $index => $file) {
+                $validation = ImageValidator::validate($file);
+
+                if (!$validation['valid']) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Image #{$index}: " . $validation['error']
+                    ], 422);
+                }
+            }
 
             $existingImages = $product->images ?? [];
             $newImages = $product->uploadMultipleImages($request->file('images'), $existingImages);
@@ -391,7 +466,7 @@ class ProductController extends Controller
             Log::error('Error uploading images: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to upload images'
+                'message' => 'Failed to upload images: ' . $e->getMessage()
             ], 500);
         }
     }
