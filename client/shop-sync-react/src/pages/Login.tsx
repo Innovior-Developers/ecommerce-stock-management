@@ -30,18 +30,18 @@ const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const from = location.state?.from?.pathname || "/";
-
-  // Redirect if already authenticated
+  // ✅ FIX: Only depend on auth state, not navigate or from
   useEffect(() => {
     if (isAuthenticated && user) {
+      const from = location.state?.from?.pathname || "/";
+
       if (user.role === "admin") {
         navigate("/admin", { replace: true });
       } else {
         navigate(from, { replace: true });
       }
     }
-  }, [isAuthenticated, user, navigate, from]);
+  }, [isAuthenticated, user]); // ✅ Remove navigate and location.state from deps
 
   const handleCustomerSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,7 +49,7 @@ const Login = () => {
       const response = await customerLogin(customerForm).unwrap();
       if (response.success) {
         toast.success("Login successful!");
-        navigate(from, { replace: true });
+        // Navigation will be handled by useEffect
       }
     } catch (error: unknown) {
       console.error("Customer login error:", error);
@@ -63,7 +63,7 @@ const Login = () => {
       const response = await adminLogin(adminForm).unwrap();
       if (response.success) {
         toast.success("Admin login successful!");
-        navigate("/admin", { replace: true });
+        // Navigation will be handled by useEffect
       }
     } catch (error: unknown) {
       console.error("Admin login error:", error);
@@ -72,6 +72,18 @@ const Login = () => {
   };
 
   const isLoading = adminLoading || customerLoading;
+
+  // ✅ Show loading state if authenticated
+  if (isAuthenticated && user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Redirecting...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
