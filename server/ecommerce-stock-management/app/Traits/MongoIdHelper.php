@@ -7,38 +7,30 @@ use MongoDB\BSON\ObjectId;
 trait MongoIdHelper
 {
     /**
-     * Get the ID regardless of format (_id or id)
-     * ✅ FIX: Make compatible with MongoDB\Laravel\Auth\User signature
-     */
-    public function getIdAttribute($value = null)
-    {
-        // If value is passed (from parent), use it
-        if ($value !== null) {
-            return $value;
-        }
-
-        // Otherwise, return _id or fallback to id
-        return $this->attributes['_id'] ?? $this->attributes['id'] ?? null;
-    }
-
-    /**
-     * Ensure _id is always set when model is retrieved
+     * Boot the trait - ensure _id is always a string
      */
     protected static function bootMongoIdHelper()
     {
+        // After model is retrieved from database
         static::retrieved(function ($model) {
-            if (!isset($model->_id) && isset($model->id)) {
-                $model->_id = $model->id;
+            if (isset($model->_id) && $model->_id instanceof ObjectId) {
+                $model->_id = (string) $model->_id;
             }
         });
-    }
 
-    /**
-     * Override primary key handling for MongoDB
-     */
-    public function getRouteKeyName()
-    {
-        return '_id';
+        // After model is created
+        static::created(function ($model) {
+            if (isset($model->_id) && $model->_id instanceof ObjectId) {
+                $model->_id = (string) $model->_id;
+            }
+        });
+
+        // After model is saved
+        static::saved(function ($model) {
+            if (isset($model->_id) && $model->_id instanceof ObjectId) {
+                $model->_id = (string) $model->_id;
+            }
+        });
     }
 
     /**
@@ -50,36 +42,42 @@ trait MongoIdHelper
     }
 
     /**
-     * Get the primary key type
+     * Get the value of the model's primary key.
      */
-    public function getKeyType()
+    public function getKey()
     {
-        return 'string';
+        return $this->getAttribute('_id');
     }
 
     /**
-     * Indicates if the IDs are auto-incrementing
+     * Get the value of the model's route key.
      */
-    public function getIncrementing()
+    public function getRouteKey()
     {
-        return false;
+        return (string) $this->getAttribute('_id');
     }
 
     /**
-     * ✅ Validate if a given ID is a valid MongoDB ObjectID
+     * Get the route key for the model.
+     */
+    public function getRouteKeyName()
+    {
+        return '_id';
+    }
+
+    /**
+     * Validate if a given ID is a valid MongoDB ObjectID
      */
     public static function isValidMongoId($id): bool
     {
         if (!is_string($id)) {
             return false;
         }
-
-        // MongoDB ObjectID is 24 character hex string
         return preg_match('/^[a-f\d]{24}$/i', $id) === 1;
     }
 
     /**
-     * ✅ Convert string to ObjectID if needed
+     * Convert string to ObjectID if needed
      */
     public static function toObjectId($id): ?ObjectId
     {
@@ -99,7 +97,7 @@ trait MongoIdHelper
     }
 
     /**
-     * ✅ Find by ID with automatic _id handling
+     * Find by ID with automatic _id handling
      */
     public static function findByMongoId($id)
     {
@@ -110,19 +108,5 @@ trait MongoIdHelper
         }
 
         return static::where('_id', $sanitizedId)->first();
-    }
-
-    /**
-     * ✅ Find multiple by IDs
-     */
-    public static function findManyByMongoIds(array $ids)
-    {
-        $sanitizedIds = array_filter($ids, [self::class, 'isValidMongoId']);
-
-        if (empty($sanitizedIds)) {
-            return collect([]);
-        }
-
-        return static::whereIn('_id', $sanitizedIds)->get();
     }
 }

@@ -5,21 +5,14 @@ namespace App\Models;
 use MongoDB\Laravel\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Tymon\JWTAuth\Contracts\JWTSubject;
-use Illuminate\Support\Facades\Hash;
-use App\Traits\MongoIdHelper; // ✅ Add this import
+use App\Traits\MongoIdHelper;
 
 class User extends Authenticatable implements JWTSubject
 {
-    use Notifiable;
-    use MongoIdHelper; // ✅ Add this trait
+    use Notifiable, MongoIdHelper;
 
     protected $connection = 'mongodb';
     protected $collection = 'users';
-
-    // ✅ These properties are already correct
-    protected $primaryKey = '_id';
-    protected $keyType = 'string';
-    public $incrementing = false;
 
     protected $fillable = [
         'name',
@@ -41,30 +34,17 @@ class User extends Authenticatable implements JWTSubject
         'email_verified_at' => 'datetime',
     ];
 
-    /**
-     * Auto-hash password on save
-     */
-    public function setPasswordAttribute($value)
-    {
-        if (!empty($value)) {
-            $this->attributes['password'] = Hash::make($value);
-        }
-    }
-
     // JWT methods
     public function getJWTIdentifier()
     {
-        return $this->getKey();
+        // Always return string representation of _id
+        return (string) $this->_id;
     }
 
     public function getJWTCustomClaims()
     {
-        return [
-            'role' => $this->role,
-            'status' => $this->status,
-            'email' => $this->email,
-            'name' => $this->name,
-        ];
+        // Return empty array to avoid claim issues
+        return [];
     }
 
     public function customer()

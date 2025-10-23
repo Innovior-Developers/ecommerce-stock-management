@@ -95,68 +95,103 @@ class JWTAuthController extends Controller
      */
     public function customerRegister(Request $request)
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users,email',
-            'password' => [
-                'required',
-                'string',
-                'confirmed',
-                Password::min(12)                    // ✅ Minimum 12 characters
-                    ->mixedCase()                    // ✅ At least one uppercase and lowercase
-                    ->numbers()                      // ✅ At least one number
-                    ->symbols()                      // ✅ At least one symbol
-                    ->uncompromised(),               // ✅ Not in known data breaches
-            ],
-            'password_confirmation' => 'required|string',
-            'first_name' => 'nullable|string|max:255',
-            'last_name' => 'nullable|string|max:255',
-            'phone' => 'nullable|string|max:20',
-        ], [
-            // ✅ Custom error messages
-            'password.min' => 'Password must be at least 12 characters long.',
-            'password.mixed' => 'Password must contain both uppercase and lowercase letters.',
-            'password.numbers' => 'Password must contain at least one number.',
-            'password.symbols' => 'Password must contain at least one special character.',
-            'password.uncompromised' => 'This password has been found in data breaches. Please choose a different password.',
-        ]);
+        try {
+            $validated = $request->validate([
+                'name' => 'required|string|max:255',
+                'email' => [
+                    'required',
+                    'string',
+                    'email',
+                    'max:255',
+                    'unique:users',
+                ],
+                'password' => [
+                    'required',
+                    'string',
+                    'confirmed',
+                    Password::min(12)
+                        ->letters()
+                        ->mixedCase()
+                        ->numbers()
+                        ->symbols()
+                        ->uncompromised(),
+                ],
+                'first_name' => 'nullable|string|max:255',
+                'last_name' => 'nullable|string|max:255',
+                'phone' => 'nullable|string|max:20',
+            ], [
+                'password.min' => 'Password must be at least 12 characters long.',
+                'password.mixed' => 'Password must contain both uppercase and lowercase letters.',
+                'password.numbers' => 'Password must contain at least one number.',
+                'password.symbols' => 'Password must contain at least one special character.',
+                'password.uncompromised' => 'This password has been found in data breaches. Please choose a different password.',
+            ]);
 
-        // ✅ Sanitize inputs
-        $validated['name'] = QuerySanitizer::sanitize($validated['name']);
-        $validated['email'] = QuerySanitizer::sanitize($validated['email']);
+            // ✅ Sanitize inputs
+            $validated['name'] = QuerySanitizer::sanitize($validated['name']);
+            $validated['email'] = QuerySanitizer::sanitize($validated['email']);
 
-        if (isset($validated['first_name'])) {
-            $validated['first_name'] = QuerySanitizer::sanitize($validated['first_name']);
+            if (isset($validated['first_name'])) {
+                $validated['first_name'] = QuerySanitizer::sanitize($validated['first_name']);
+            }
+            if (isset($validated['last_name'])) {
+                $validated['last_name'] = QuerySanitizer::sanitize($validated['last_name']);
+            }
+            if (isset($validated['phone'])) {
+                $validated['phone'] = QuerySanitizer::sanitize($validated['phone']);
+            }
+
+            // Create user
+            $user = User::create([
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'password' => Hash::make($validated['password']),
+                'role' => 'customer',
+                'status' => 'active',
+                'email_verified_at' => now(),
+            ]);
+
+            // The MongoIdHelper trait automatically converts _id to string
+            Log::info('User created', [
+                'user_id' => $user->_id,
+                'user_id_type' => gettype($user->_id),
+            ]);
+
+            // Create customer profile
+            Customer::create([
+                'user_id' => (string) $user->_id,
+                'first_name' => $validated['first_name'] ?? '',
+                'last_name' => $validated['last_name'] ?? '',
+                'phone' => $validated['phone'] ?? '',
+                'marketing_consent' => false,
+            ]);
+
+            // Generate JWT token directly from the created user
+            $token = JWTAuth::fromUser($user);
+
+            Log::info('Registration successful', [
+                'user_id' => $user->_id,
+                'token_generated' => !empty($token),
+            ]);
+
+            return $this->respondWithToken($token, $user, 'Registration successful', 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Registration error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Registration failed: ' . $e->getMessage(),
+            ], 500);
         }
-        if (isset($validated['last_name'])) {
-            $validated['last_name'] = QuerySanitizer::sanitize($validated['last_name']);
-        }
-        if (isset($validated['phone'])) {
-            $validated['phone'] = QuerySanitizer::sanitize($validated['phone']);
-        }
-
-        // Create user
-        $user = User::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'password' => $validated['password'], // ✅ Auto-hashed in User model
-            'role' => 'customer',
-            'status' => 'active',
-            'email_verified_at' => now(),
-        ]);
-
-        // Create customer profile
-        Customer::create([
-            'user_id' => $user->_id,
-            'first_name' => $validated['first_name'] ?? '',
-            'last_name' => $validated['last_name'] ?? '',
-            'phone' => $validated['phone'] ?? '',
-            'marketing_consent' => false,
-        ]);
-
-        $token = JWTAuth::fromUser($user);
-
-        return $this->respondWithToken($token, $user, 'Registration successful', 201);
     }
 
     /**
