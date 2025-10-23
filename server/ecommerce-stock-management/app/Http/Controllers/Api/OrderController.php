@@ -4,94 +4,96 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
-use App\Models\Customer;
+use App\Models\Product;
+use App\Services\QuerySanitizer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
-use App\Services\QuerySanitizer;
 
 class OrderController extends Controller
 {
+    /**
+     * List orders (customers see only their orders, admins see all)
+     * GET /api/customer/orders or /api/admin/orders
+     */
     public function index(Request $request)
     {
         try {
-            $query = Order::with(['customer.user']);
+            $user = $request->user();
 
-            // ✅ SANITIZE status filter
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Authentication required',
+                ], 401);
+            }
+
+            $query = Order::with(['customer.user:_id,name,email']);
+
+            // ✅ If customer, only show their orders
+            if ($user->isCustomer() && $user->customer) {
+                $query->where('customer_id', (string) $user->customer->_id);
+            }
+
+            // Filter by status
             if ($request->has('status')) {
-                $status = QuerySanitizer::sanitize($request->get('status'));
-                if (in_array($status, ['pending', 'processing', 'shipped', 'delivered', 'cancelled'])) {
-                    $query->where('status', $status);
-                }
+                $status = QuerySanitizer::sanitize($request->status);
+                $query->where('status', $status);
             }
 
-            // ✅ SANITIZE customer_id filter
-            if ($request->has('customer_id')) {
-                $customerId = QuerySanitizer::sanitizeMongoId($request->get('customer_id'));
-                if ($customerId) {
-                    $query->where('customer_id', $customerId);
-                }
+            // Filter by payment status
+            if ($request->has('payment_status')) {
+                $paymentStatus = QuerySanitizer::sanitize($request->payment_status);
+                $query->where('payment_status', $paymentStatus);
             }
 
-            // Date filters
-            if ($request->has('date_from')) {
-                $query->where('created_at', '>=', $request->date_from);
-            }
-
-            if ($request->has('date_to')) {
-                $query->where('created_at', '<=', $request->date_to);
-            }
-
-            $orders = $query->latest()->get();
-
-            // ✅ Ensure consistent ID format
-            $ordersData = $orders->map(function ($order) {
-                return [
-                    '_id' => $order->_id,
-                    'id' => $order->_id, // ✅ Include both
-                    'order_number' => $order->order_number,
-                    'customer_id' => $order->customer_id,
-                    'customer' => $order->customer ? [
-                        '_id' => $order->customer->_id,
-                        'id' => $order->customer->_id,
-                        'name' => $order->customer->getFullNameAttribute(),
-                        'email' => $order->customer->user->email ?? null,
-                    ] : null,
-                    'items' => $order->items,
-                    'shipping_address' => $order->shipping_address,
-                    'billing_address' => $order->billing_address,
-                    'payment' => $order->payment,
-                    'status' => $order->status,
-                    'subtotal' => $order->subtotal,
-                    'tax' => $order->tax,
-                    'shipping_cost' => $order->shipping_cost,
-                    'total' => $order->total,
-                    'notes' => $order->notes,
-                    'tracking_number' => $order->tracking_number,
-                    'created_at' => $order->created_at,
-                    'updated_at' => $order->updated_at,
-                ];
-            });
+            $perPage = min((int) $request->get('per_page', 20), 50);
+            $orders = $query->latest()->paginate($perPage);
 
             return response()->json([
                 'success' => true,
-                'data' => $ordersData,
+                'data' => $orders->items(),
+                'pagination' => [
+                    'current_page' => $orders->currentPage(),
+                    'total_pages' => $orders->lastPage(),
+                    'per_page' => $orders->perPage(),
+                    'total' => $orders->total(),
+                ],
             ]);
         } catch (\Exception $e) {
-            Log::error('Error fetching orders: ' . $e->getMessage());
+            Log::error('Order Index Error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to fetch orders'
+                'message' => 'Failed to retrieve orders',
             ], 500);
         }
     }
 
+    /**
+     * Create new order (customer route only)
+     * POST /api/customer/orders
+     */
     public function store(Request $request)
     {
         try {
-            $validated = $request->validate([
-                'customer_id' => 'required|string',
+            // ✅ Get authenticated user
+            $user = $request->user();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Authentication required',
+                ], 401);
+            }
+
+            // ✅ Validate request (NO customer_id required!)
+            $validator = Validator::make($request->all(), [
                 'items' => 'required|array|min:1',
                 'items.*.product_id' => 'required|string',
                 'items.*.quantity' => 'required|integer|min:1',
@@ -101,240 +103,309 @@ class OrderController extends Controller
                 'shipping_address.city' => 'required|string',
                 'shipping_address.country' => 'required|string',
                 'shipping_address.postal_code' => 'required|string',
-                'payment' => 'required|array',
-                'payment.method' => 'required|string',
-                'notes' => 'nullable|string',
+                'billing_address' => 'sometimes|array',
+                'payment.method' => 'required|string|in:stripe,paypal,payhere,cod',
+                'notes' => 'nullable|string|max:500',
             ]);
 
-            // ✅ VALIDATE customer_id
-            $customerId = QuerySanitizer::sanitizeMongoId($validated['customer_id']);
-            if (!$customerId) {
+            if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Invalid customer ID format'
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
+            $validated = $validator->validated();
+
+            // ✅ Auto-extract customer_id from JWT token
+            if (!$user->customer) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Customer profile not found. Please complete your profile first.',
                 ], 400);
             }
 
-            // ✅ Verify customer exists
-            if (!Customer::where('_id', $customerId)->exists()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Customer not found'
-                ], 404);
-            }
+            $customerId = (string) $user->customer->_id;
 
-            // ✅ SANITIZE and validate product IDs in items
-            foreach ($validated['items'] as $key => $item) {
+            // ✅ Validate and sanitize product IDs
+            $sanitizedItems = [];
+            foreach ($validated['items'] as $item) {
                 $productId = QuerySanitizer::sanitizeMongoId($item['product_id']);
+
                 if (!$productId) {
                     return response()->json([
                         'success' => false,
-                        'message' => "Invalid product ID in item {$key}"
+                        'message' => "Invalid product ID: {$item['product_id']}",
                     ], 400);
                 }
-                $validated['items'][$key]['product_id'] = $productId;
+
+                // ✅ Verify product exists and has stock
+                $product = Product::where('_id', $productId)->first();
+
+                if (!$product) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Product not found: {$productId}",
+                    ], 404);
+                }
+
+                if ($product->stock_quantity < $item['quantity']) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Insufficient stock for {$product->name}. Available: {$product->stock_quantity}",
+                    ], 400);
+                }
+
+                $sanitizedItems[] = [
+                    'product_id' => $productId,
+                    'product_name' => $product->name,
+                    'quantity' => (int) $item['quantity'],
+                    'unit_price' => (float) $item['unit_price'],
+                    'subtotal' => (float) $item['unit_price'] * (int) $item['quantity'],
+                ];
             }
 
-            // Calculate totals
-            $subtotal = 0;
-            foreach ($validated['items'] as $item) {
-                $subtotal += $item['quantity'] * $item['unit_price'];
-            }
-
+            // ✅ Calculate totals
+            $subtotal = array_sum(array_column($sanitizedItems, 'subtotal'));
             $tax = $subtotal * 0.1; // 10% tax
-            $shipping_cost = 10.00; // Fixed shipping
-            $total = $subtotal + $tax + $shipping_cost;
+            $shipping = $subtotal > 100 ? 0 : 15.99; // Free shipping over $100
+            $total = $subtotal + $tax + $shipping;
 
+            // ✅ Create order
             $order = Order::create([
                 'order_number' => 'ORD-' . strtoupper(Str::random(8)),
-                'customer_id' => $customerId,
-                'items' => $validated['items'],
+                'customer_id' => $customerId, // ✅ Auto-extracted from JWT
+                'user_id' => (string) $user->_id,
+                'items' => $sanitizedItems,
                 'shipping_address' => $validated['shipping_address'],
-                'billing_address' => $validated['shipping_address'],
-                'payment' => array_merge($validated['payment'], ['status' => 'pending']),
+                'billing_address' => $validated['billing_address'] ?? $validated['shipping_address'],
                 'status' => 'pending',
+                'payment_status' => 'pending',
                 'subtotal' => $subtotal,
                 'tax' => $tax,
-                'shipping_cost' => $shipping_cost,
+                'shipping' => $shipping,
                 'total' => $total,
                 'notes' => $validated['notes'] ?? null,
             ]);
 
-            Cache::flush();
+            // ✅ Reduce stock quantity for each item
+            foreach ($sanitizedItems as $item) {
+                Product::where('_id', $item['product_id'])
+                    ->decrement('stock_quantity', $item['quantity']);
+            }
+
+            Log::info('Order created successfully', [
+                'order_id' => (string) $order->_id,
+                'customer_id' => $customerId,
+                'total' => $total,
+            ]);
+
+            Cache::tags(['orders'])->flush();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Order created successfully',
-                'data' => [
-                    '_id' => $order->_id,
-                    'id' => $order->_id,
-                    'order_number' => $order->order_number,
-                    'total' => $order->total,
-                    'status' => $order->status,
-                ],
+                'data' => $order->fresh(['customer.user']),
             ], 201);
         } catch (\Exception $e) {
-            Log::error('Error creating order: ' . $e->getMessage());
+            Log::error('Order Creation Error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to create order'
+                'message' => 'Failed to create order',
             ], 500);
         }
     }
 
-    public function show($id)
+    /**
+     * Get single order details
+     * GET /api/customer/orders/{id} or /api/admin/orders/{id}
+     */
+    public function show(Request $request, $id)
     {
         try {
-            // ✅ VALIDATE and SANITIZE ID
-            $sanitizedId = QuerySanitizer::sanitizeMongoId($id);
+            $user = $request->user();
 
-            if (!$sanitizedId) {
+            if (!$user) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Invalid order ID format'
+                    'message' => 'Authentication required',
+                ], 401);
+            }
+
+            $orderId = QuerySanitizer::sanitizeMongoId($id);
+
+            if (!$orderId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid order ID',
                 ], 400);
             }
 
-            $order = Order::with('customer.user')
-                ->where('_id', $sanitizedId)
+            $order = Order::where('_id', $orderId)
+                ->with('customer.user')
                 ->first();
 
             if (!$order) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Order not found'
+                    'message' => 'Order not found',
                 ], 404);
+            }
+
+            // ✅ Verify ownership if customer
+            if ($user->isCustomer() && $order->customer_id !== (string) $user->customer->_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized',
+                ], 403);
             }
 
             return response()->json([
                 'success' => true,
-                'data' => [
-                    '_id' => $order->_id,
-                    'id' => $order->_id,
-                    'order_number' => $order->order_number,
-                    'customer' => $order->customer ? [
-                        '_id' => $order->customer->_id,
-                        'id' => $order->customer->_id,
-                        'name' => $order->customer->getFullNameAttribute(),
-                        'email' => $order->customer->user->email ?? null,
-                    ] : null,
-                    'items' => $order->items,
-                    'shipping_address' => $order->shipping_address,
-                    'billing_address' => $order->billing_address,
-                    'payment' => $order->payment,
-                    'status' => $order->status,
-                    'subtotal' => $order->subtotal,
-                    'tax' => $order->tax,
-                    'shipping_cost' => $order->shipping_cost,
-                    'total' => $order->total,
-                    'notes' => $order->notes,
-                    'tracking_number' => $order->tracking_number,
-                    'created_at' => $order->created_at,
-                    'updated_at' => $order->updated_at,
-                ],
+                'data' => $order,
             ]);
         } catch (\Exception $e) {
-            Log::error('Error fetching order: ' . $e->getMessage());
+            Log::error('Order Show Error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to fetch order'
+                'message' => 'Failed to retrieve order',
             ], 500);
         }
     }
 
+    /**
+     * Update order (admin only - status updates)
+     * PUT /api/admin/orders/{id}
+     */
     public function update(Request $request, $id)
     {
         try {
-            // ✅ VALIDATE and SANITIZE ID
-            $sanitizedId = QuerySanitizer::sanitizeMongoId($id);
+            $user = $request->user();
 
-            if (!$sanitizedId) {
+            if (!$user) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Invalid order ID format'
+                    'message' => 'Authentication required',
+                ], 401);
+            }
+
+            $orderId = QuerySanitizer::sanitizeMongoId($id);
+
+            if (!$orderId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid order ID',
                 ], 400);
             }
 
-            $order = Order::where('_id', $sanitizedId)->first();
+            $order = Order::where('_id', $orderId)->first();
 
             if (!$order) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Order not found'
+                    'message' => 'Order not found',
                 ], 404);
             }
 
-            $validated = $request->validate([
+            // ✅ Only admins can update orders
+            if (!$user->isAdmin()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized. Admin access required.',
+                ], 403);
+            }
+
+            $validator = Validator::make($request->all(), [
                 'status' => 'sometimes|string|in:pending,processing,shipped,delivered,cancelled',
-                'payment' => 'sometimes|array',
-                'payment.status' => 'sometimes|string|in:pending,paid,failed,refunded',
-                'shipping_address' => 'sometimes|array',
+                'payment_status' => 'sometimes|string|in:pending,paid,failed,refunded',
                 'tracking_number' => 'nullable|string',
                 'notes' => 'nullable|string',
             ]);
 
-            // ✅ SANITIZE string inputs
-            if (isset($validated['tracking_number'])) {
-                $validated['tracking_number'] = QuerySanitizer::sanitize($validated['tracking_number']);
-            }
-            if (isset($validated['notes'])) {
-                $validated['notes'] = QuerySanitizer::sanitize($validated['notes']);
-            }
-
-            // Update timestamps based on status
-            if (isset($validated['status'])) {
-                if ($validated['status'] === 'shipped' && !$order->shipped_at) {
-                    $validated['shipped_at'] = now();
-                }
-                if ($validated['status'] === 'delivered' && !$order->delivered_at) {
-                    $validated['delivered_at'] = now();
-                }
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors(),
+                ], 422);
             }
 
-            $order->update($validated);
+            $order->update($validator->validated());
 
-            Cache::forget("order_{$sanitizedId}");
-            Cache::flush();
+            Cache::forget("order_{$orderId}");
+            Cache::tags(['orders'])->flush();
+
+            Log::info('Order updated', [
+                'order_id' => (string) $order->_id,
+                'updated_by' => (string) $user->_id,
+            ]);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Order updated successfully',
-                'data' => [
-                    '_id' => $order->_id,
-                    'id' => $order->_id,
-                    'order_number' => $order->order_number,
-                    'status' => $order->status,
-                    'updated_at' => $order->updated_at,
-                ],
+                'data' => $order->fresh(),
             ]);
         } catch (\Exception $e) {
-            Log::error('Error updating order: ' . $e->getMessage());
+            Log::error('Order Update Error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update order'
+                'message' => 'Failed to update order',
             ], 500);
         }
     }
 
-    public function destroy($id)
+    /**
+     * Delete order (admin only - pending orders only)
+     * DELETE /api/admin/orders/{id}
+     */
+    public function destroy(Request $request, $id)
     {
         try {
-            // ✅ VALIDATE and SANITIZE ID
-            $sanitizedId = QuerySanitizer::sanitizeMongoId($id);
+            $user = $request->user();
 
-            if (!$sanitizedId) {
+            if (!$user) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Invalid order ID format'
+                    'message' => 'Authentication required',
+                ], 401);
+            }
+
+            // ✅ Only admins can delete orders
+            if (!$user->isAdmin()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized',
+                ], 403);
+            }
+
+            $orderId = QuerySanitizer::sanitizeMongoId($id);
+
+            if (!$orderId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid order ID',
                 ], 400);
             }
 
-            $order = Order::where('_id', $sanitizedId)->first();
+            $order = Order::where('_id', $orderId)->first();
 
             if (!$order) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Order not found'
+                    'message' => 'Order not found',
                 ], 404);
             }
 
@@ -342,24 +413,39 @@ class OrderController extends Controller
             if ($order->status !== 'pending') {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Cannot delete order that is not in pending status'
+                    'message' => 'Cannot delete order that is not pending',
                 ], 400);
+            }
+
+            // ✅ Restore stock quantities
+            foreach ($order->items as $item) {
+                Product::where('_id', $item['product_id'])
+                    ->increment('stock_quantity', $item['quantity']);
             }
 
             $order->delete();
 
-            Cache::forget("order_{$sanitizedId}");
-            Cache::flush();
+            Cache::forget("order_{$orderId}");
+            Cache::tags(['orders'])->flush();
+
+            Log::info('Order deleted', [
+                'order_id' => $orderId,
+                'deleted_by' => (string) $user->_id,
+            ]);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Order deleted successfully'
+                'message' => 'Order deleted successfully',
             ]);
         } catch (\Exception $e) {
-            Log::error('Error deleting order: ' . $e->getMessage());
+            Log::error('Order Delete Error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to delete order'
+                'message' => 'Failed to delete order',
             ], 500);
         }
     }

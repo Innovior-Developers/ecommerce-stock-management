@@ -4,11 +4,12 @@ namespace App\Models;
 
 use MongoDB\Laravel\Eloquent\Model;
 use MongoDB\Laravel\Relations\BelongsTo;
+use MongoDB\Laravel\Relations\HasMany;
 use App\Traits\MongoIdHelper;
 
 class Order extends Model
 {
-    use MongoIdHelper; // ✅ Add this trait
+    use MongoIdHelper;
 
     protected $connection = 'mongodb';
     protected $collection = 'orders';
@@ -16,54 +17,56 @@ class Order extends Model
     protected $fillable = [
         'order_number',
         'customer_id',
+        'user_id',
         'items',
-        'shipping_address',
-        'billing_address',
-        'payment',
-        'status',
         'subtotal',
         'tax',
-        'shipping_cost',
+        'shipping',
         'total',
+        'status', // pending, processing, shipped, delivered, cancelled
+        'payment_status', // pending, paid, failed, refunded
+        'shipping_address',
+        'billing_address',
         'notes',
         'tracking_number',
-        'shipped_at',
-        'delivered_at',
     ];
 
     protected $casts = [
-        '_id' => 'string', // ✅ Add this
         'items' => 'array',
-        'shipping_address' => 'array',
-        'billing_address' => 'array',
-        'payment' => 'array',
         'subtotal' => 'decimal:2',
         'tax' => 'decimal:2',
-        'shipping_cost' => 'decimal:2',
+        'shipping' => 'decimal:2',
         'total' => 'decimal:2',
-        'shipped_at' => 'datetime',
-        'delivered_at' => 'datetime',
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime',
+        'shipping_address' => 'array',
+        'billing_address' => 'array',
     ];
 
-    // Fixed relationship - should reference Customer, not User
+    // Auto-generate order number
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($order) {
+            if (!$order->order_number) {
+                $order->order_number = 'ORD-' . strtoupper(uniqid());
+            }
+        });
+    }
+
+    // Relationships
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class, 'customer_id', '_id');
     }
 
-    // Relationship to user through customer
-    public function user()
+    public function user(): BelongsTo
     {
-        return $this->hasOneThrough(
-            User::class,
-            Customer::class,
-            '_id',      // Foreign key on customers table
-            '_id',      // Foreign key on users table
-            'customer_id', // Local key on orders table
-            'user_id'   // Local key on customers table
-        );
+        return $this->belongsTo(User::class, 'user_id', '_id');
+    }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class, 'order_id', '_id');
     }
 
     // Scopes
@@ -79,25 +82,22 @@ class Order extends Model
 
     public function scopeCompleted($query)
     {
-        return $query->where('status', 'delivered');
+        return $query->whereIn('status', ['shipped', 'delivered']);
     }
 
-    public function scopeByDateRange($query, $from, $to)
+    public function scopePaid($query)
     {
-        return $query->whereBetween('created_at', [$from, $to]);
+        return $query->where('payment_status', 'paid');
     }
 
-    // Methods
-    public function calculateTotal()
+    // Accessors
+    public function getIsPaidAttribute(): bool
     {
-        $subtotal = collect($this->items)->sum(function ($item) {
-            return $item['quantity'] * $item['unit_price'];
-        });
+        return $this->payment_status === 'paid';
+    }
 
-        $this->subtotal = $subtotal;
-        $this->tax = $subtotal * 0.1; // 10% tax
-        $this->total = $this->subtotal + $this->tax + $this->shipping_cost;
-
-        return $this->total;
+    public function getIsCompletedAttribute(): bool
+    {
+        return in_array($this->status, ['shipped', 'delivered']);
     }
 }
