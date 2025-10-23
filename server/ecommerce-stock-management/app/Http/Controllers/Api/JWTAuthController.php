@@ -14,10 +14,8 @@ use Tymon\JWTAuth\Exceptions\TokenExpiredException;
 use Tymon\JWTAuth\Exceptions\TokenInvalidException;
 use App\Services\QuerySanitizer;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\DB; // ✅ Add this
 use App\Models\JwtBlacklist;
 use Illuminate\Validation\Rules\Password;
-use MongoDB\BSON\ObjectId; // ✅ Add this line
 
 class JWTAuthController extends Controller
 {
@@ -97,166 +95,68 @@ class JWTAuthController extends Controller
      */
     public function customerRegister(Request $request)
     {
-        \DB::beginTransaction(); // ✅ Use database transaction for data consistency
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users,email',
+            'password' => [
+                'required',
+                'string',
+                'confirmed',
+                Password::min(12)                    // ✅ Minimum 12 characters
+                    ->mixedCase()                    // ✅ At least one uppercase and lowercase
+                    ->numbers()                      // ✅ At least one number
+                    ->symbols()                      // ✅ At least one symbol
+                    ->uncompromised(),               // ✅ Not in known data breaches
+            ],
+            'password_confirmation' => 'required|string',
+            'first_name' => 'nullable|string|max:255',
+            'last_name' => 'nullable|string|max:255',
+            'phone' => 'nullable|string|max:20',
+        ], [
+            // ✅ Custom error messages
+            'password.min' => 'Password must be at least 12 characters long.',
+            'password.mixed' => 'Password must contain both uppercase and lowercase letters.',
+            'password.numbers' => 'Password must contain at least one number.',
+            'password.symbols' => 'Password must contain at least one special character.',
+            'password.uncompromised' => 'This password has been found in data breaches. Please choose a different password.',
+        ]);
 
-        try {
-            // ✅ Validate inputs
-            $validated = $request->validate([
-                'name' => 'required|string|max:255',
-                'email' => 'required|string|email|max:255|unique:users,email',
-                'password' => [
-                    'required',
-                    'string',
-                    'confirmed',
-                    Password::min(12)
-                        ->mixedCase()
-                        ->numbers()
-                        ->symbols()
-                        ->uncompromised(),
-                ],
-                'password_confirmation' => 'required|string',
-                'first_name' => 'nullable|string|max:255',
-                'last_name' => 'nullable|string|max:255',
-                'phone' => 'nullable|string|max:20',
-            ], [
-                'password.min' => 'Password must be at least 12 characters long.',
-                'password.mixed' => 'Password must contain both uppercase and lowercase letters.',
-                'password.numbers' => 'Password must contain at least one number.',
-                'password.symbols' => 'Password must contain at least one special character.',
-                'password.uncompromised' => 'This password has been found in data breaches. Please choose a different password.',
-            ]);
+        // ✅ Sanitize inputs
+        $validated['name'] = QuerySanitizer::sanitize($validated['name']);
+        $validated['email'] = QuerySanitizer::sanitize($validated['email']);
 
-            // ✅ Sanitize inputs
-            $validated['name'] = QuerySanitizer::sanitize($validated['name']);
-            $validated['email'] = QuerySanitizer::sanitize($validated['email']);
-
-            if (isset($validated['first_name'])) {
-                $validated['first_name'] = QuerySanitizer::sanitize($validated['first_name']);
-            }
-            if (isset($validated['last_name'])) {
-                $validated['last_name'] = QuerySanitizer::sanitize($validated['last_name']);
-            }
-            if (isset($validated['phone'])) {
-                $validated['phone'] = QuerySanitizer::sanitize($validated['phone']);
-            }
-
-            // ✅ STEP 1: Create customer profile using save() (forces _id generation)
-            $customer = new Customer();
-            $customer->first_name = $validated['first_name'] ?? '';
-            $customer->last_name = $validated['last_name'] ?? '';
-            $customer->phone = $validated['phone'] ?? '';
-            $customer->marketing_consent = false;
-
-            // ✅ CRITICAL: Save and verify _id was generated
-            if (!$customer->save()) {
-                throw new \Exception('Failed to create customer profile');
-            }
-
-            // ✅ Force refresh to ensure _id is available
-            $customer->refresh();
-
-            // ✅ Verify _id exists and is valid
-            if (!$customer->_id || !($customer->_id instanceof \MongoDB\BSON\ObjectId)) {
-                throw new \Exception('Customer _id not generated correctly');
-            }
-
-            $customerId = (string) $customer->_id;
-
-            Log::info('✅ Customer created with _id', [
-                'customer_id' => $customerId,
-                'customer_id_type' => get_class($customer->_id),
-                'first_name' => $customer->first_name,
-            ]);
-
-            // ✅ STEP 2: Create user with customer_id
-            $user = new User();
-            $user->name = $validated['name'];
-            $user->email = $validated['email'];
-            $user->password = Hash::make($validated['password']);
-            $user->role = 'customer';
-            $user->customer_id = $customerId; // ✅ String format
-            $user->status = 'active';
-            $user->email_verified_at = now();
-
-            if (!$user->save()) {
-                throw new \Exception('Failed to create user');
-            }
-
-            // ✅ Force refresh user
-            $user->refresh();
-
-            Log::info('✅ User created', [
-                'user_id' => (string) $user->_id,
-                'customer_id_in_user' => $user->customer_id,
-            ]);
-
-            // ✅ STEP 3: Final verification
-            $userCheck = User::where('_id', $user->_id)->first();
-
-            if (!$userCheck) {
-                throw new \Exception('User verification failed');
-            }
-
-            if (empty($userCheck->customer_id)) {
-                Log::error('❌ CRITICAL: customer_id empty after save', [
-                    'user_id' => (string) $userCheck->_id,
-                    'customer_id_value' => $userCheck->customer_id,
-                ]);
-
-                // ✅ Last resort: Force raw update
-                \DB::connection('mongodb')
-                    ->collection('users')
-                    ->where('_id', $userCheck->_id)
-                    ->update(['customer_id' => $customerId]);
-
-                $userCheck = User::where('_id', $userCheck->_id)->first();
-
-                Log::warning('⚠️ Force updated customer_id', [
-                    'customer_id_now' => $userCheck->customer_id,
-                ]);
-            }
-
-            // ✅ Commit transaction
-            \DB::commit();
-
-            // ✅ Generate JWT token
-            $token = JWTAuth::fromUser($userCheck);
-
-            Log::info('✅ Registration successful', [
-                'user_id' => (string) $userCheck->_id,
-                'customer_id' => $customerId,
-                'customer_id_in_user' => $userCheck->customer_id,
-            ]);
-
-            return $this->respondWithToken($token, $userCheck, 'Registration successful', 201);
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            \DB::rollBack();
-
-            Log::error('❌ Registration validation failed', [
-                'errors' => $e->errors(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $e->errors(),
-            ], 422);
-        } catch (\Exception $e) {
-            \DB::rollBack();
-
-            Log::error('❌ Registration error', [
-                'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Registration failed. Please try again.',
-                'error' => config('app.debug') ? $e->getMessage() : 'Internal server error',
-            ], 500);
+        if (isset($validated['first_name'])) {
+            $validated['first_name'] = QuerySanitizer::sanitize($validated['first_name']);
         }
+        if (isset($validated['last_name'])) {
+            $validated['last_name'] = QuerySanitizer::sanitize($validated['last_name']);
+        }
+        if (isset($validated['phone'])) {
+            $validated['phone'] = QuerySanitizer::sanitize($validated['phone']);
+        }
+
+        // Create user
+        $user = User::create([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => $validated['password'], // ✅ Auto-hashed in User model
+            'role' => 'customer',
+            'status' => 'active',
+            'email_verified_at' => now(),
+        ]);
+
+        // Create customer profile
+        Customer::create([
+            'user_id' => $user->_id,
+            'first_name' => $validated['first_name'] ?? '',
+            'last_name' => $validated['last_name'] ?? '',
+            'phone' => $validated['phone'] ?? '',
+            'marketing_consent' => false,
+        ]);
+
+        $token = JWTAuth::fromUser($user);
+
+        return $this->respondWithToken($token, $user, 'Registration successful', 201);
     }
 
     /**
@@ -478,17 +378,15 @@ class JWTAuthController extends Controller
             'success' => true,
             'message' => $message,
             'user' => [
-                'id' => (string) $user->_id,
                 'name' => $user->name,
                 'email' => $user->email,
                 'role' => $user->role,
                 'status' => $user->status,
                 'avatar' => $user->avatar,
-                'customer_id' => $user->customer_id ? (string) $user->customer_id : null,
             ],
             'token' => $token,
             'token_type' => 'bearer',
-            'expires_in' => config('jwt.ttl') * 60
+            'expires_in' => config('jwt.ttl') * 60 // Convert minutes to seconds
         ], $statusCode);
     }
 }

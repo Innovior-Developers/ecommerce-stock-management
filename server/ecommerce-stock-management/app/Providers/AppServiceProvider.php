@@ -14,25 +14,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        // ✅ Register payment gateway services
-        $this->app->bind(
-            \App\Services\PaymentGateway\PaymentGatewayInterface::class,
-            function ($app) {
-                $gateway = config('payment.default_gateway', 'stripe');
-                
-                return match($gateway) {
-                    'stripe' => new \App\Services\PaymentGateway\StripeService(),
-                    'paypal' => new \App\Services\PaymentGateway\PayPalService(),
-                    'payhere' => new \App\Services\PaymentGateway\PayHereService(),
-                    default => new \App\Services\PaymentGateway\StripeService(),
-                };
-            }
-        );
-
-        // ✅ Register individual services
-        $this->app->singleton(\App\Services\PaymentGateway\StripeService::class);
-        $this->app->singleton(\App\Services\PaymentGateway\PayPalService::class);
-        $this->app->singleton(\App\Services\PaymentGateway\PayHereService::class);
+        //
     }
 
     /**

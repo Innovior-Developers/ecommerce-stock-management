@@ -3,69 +3,44 @@
 namespace App\Models;
 
 use MongoDB\Laravel\Eloquent\Model;
-use MongoDB\Laravel\Relations\BelongsTo;
-use MongoDB\BSON\ObjectId; // ✅ Add this import
-use App\Traits\MongoIdHelper;
+use MongoDB\Laravel\Relations\HasMany;
+use App\Traits\MongoIdHelper; // ✅ Add this import
 
 class Customer extends Model
 {
-    use MongoIdHelper;
+    use MongoIdHelper; // ✅ Add this trait
 
     protected $connection = 'mongodb';
     protected $collection = 'customers';
+
+    // ✅ These properties are already correct
+    protected $primaryKey = '_id';
+    protected $keyType = 'string';
+    public $incrementing = false;
 
     protected $fillable = [
         'user_id',
         'first_name',
         'last_name',
         'phone',
-        'address',
-        'city',
-        'state',
-        'country',
-        'postal_code',
-        'date_of_birth',
-        'gender',
-        'addresses',
-        'preferences',
         'marketing_consent',
     ];
 
     protected $casts = [
-        'date_of_birth' => 'date',
-        'addresses' => 'array',
-        'preferences' => 'array',
+        '_id' => 'string',
+        'user_id' => 'string',
         'marketing_consent' => 'boolean',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
-    /**
-     * Boot method to force _id generation
-     */
-    protected static function boot()
+    public function user()
     {
-        parent::boot();
-
-        static::creating(function ($customer) {
-            // Ensure _id is generated before save
-            if (!isset($customer->_id)) {
-                $customer->_id = new ObjectId(); // ✅ Now properly imported
-            }
-        });
+        return $this->belongsTo(User::class, 'user_id', '_id');
     }
 
-    /**
-     * Relationship: Customer belongs to User
-     */
-    public function user(): BelongsTo
+    public function orders(): HasMany
     {
-        return $this->belongsTo(User::class, 'customer_id', '_id');
-    }
-
-    /**
-     * Accessor: Full Name
-     */
-    public function getFullNameAttribute(): string
-    {
-        return trim("{$this->first_name} {$this->last_name}");
+        return $this->hasMany(Order::class, 'customer_id', '_id');
     }
 }
