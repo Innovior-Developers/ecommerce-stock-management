@@ -1,0 +1,24 @@
+next need to implemennt payment method in the backend and then frontend part.
+
+
+
+C:\Users\CHAMA COMPUTERS>stripe listen --forward-to localhost:3000/webhook
+
+> Ready! You are using Stripe API Version [2025-09-30.clover]. 
+Your webhook signing secret is 
+whsec_36951bc6ad47b3a22c92cc32135183cb8253579410c127d46095edabf5b552fc 
+
+
+
+
+C:\Users\CHAMA COMPUTERS>ssh -R 80:localhost:3000 serveo.net
+The authenticity of host 'serveo.net (138.68.79.95)' can't be established.
+RSA key fingerprint is SHA256:07jcXlJ4SkBnyTmaVnmTpXuBiRx2+Q2adxbttO9gt0M.
+This key is not known by any other names.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added 'serveo.net' (RSA) to the list of known hosts.
+Forwarding HTTP traffic from https://05aef7a7a23a89bddca002d459448e96.serveo.net
+
+CHAMA COMPUTERS@ASUS-TUF-F-15 MINGW64 ~/Downloads/Innovior IOT/esm (thisara)
+$ ssh -R 80:localhost:3000 serveo.net
+Forwarding HTTP traffic from https://f7fec3dbdc54c6dabf1143e22741bf68.serveo.net
