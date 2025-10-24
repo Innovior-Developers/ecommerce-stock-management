@@ -13,8 +13,32 @@ class PayPalService implements PaymentGatewayInterface
     public function __construct()
     {
         $this->paypal = new PayPalClient;
-        $this->paypal->setApiCredentials(config('payment.paypal'));
-        $this->paypal->getAccessToken();
+
+        // ✅ FIX: Set API credentials from config
+        $config = config('payment.paypal');
+
+        Log::info('PayPal Configuration Loaded', [
+            'mode' => $config['mode'] ?? 'unknown',
+            'has_client_id' => !empty($config['sandbox']['client_id']),
+            'has_client_secret' => !empty($config['sandbox']['client_secret']),
+            'payment_action' => $config['payment_action'] ?? 'missing',
+        ]);
+
+        $this->paypal->setApiCredentials($config);
+
+        // ✅ Get access token
+        $token = $this->paypal->getAccessToken();
+
+        if (isset($token['error'])) {
+            Log::error('PayPal Access Token Error', [
+                'error' => $token['error'],
+                'message' => $token['error_description'] ?? 'Unknown error',
+            ]);
+
+            throw new \Exception('PayPal authentication failed: ' . ($token['error_description'] ?? 'Unknown error'));
+        }
+
+        Log::info('PayPal Access Token Retrieved Successfully');
     }
 
     public function createPayment(array $data): array

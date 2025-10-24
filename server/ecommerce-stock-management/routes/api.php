@@ -129,7 +129,7 @@ Route::prefix('payment')->middleware(['jwt.auth', 'throttle:payment'])->group(fu
 // ✅ WEBHOOK ROUTES (No JWT, Rate Limited)
 // ========================================
 
-Route::prefix('webhooks')->middleware('throttle:webhook')->group(function () {
+Route::prefix('webhooks')->group(function () {
     Route::post('/stripe', [PaymentWebhookController::class, 'stripe']);
     Route::post('/paypal', [PaymentWebhookController::class, 'paypal']);
     Route::post('/payhere', [PaymentWebhookController::class, 'payhere']);

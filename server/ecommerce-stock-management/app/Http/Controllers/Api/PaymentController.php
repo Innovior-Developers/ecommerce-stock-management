@@ -311,7 +311,7 @@ class PaymentController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'payment_id' => 'required|string',
-                'transaction_id' => 'required|string',
+                'transaction_id' => 'sometimes|string', // Optional for some gateways
             ]);
 
             if ($validator->fails()) {
@@ -348,49 +348,135 @@ class PaymentController extends Controller
                 ], 404);
             }
 
-            if ($payment->user_id !== (string) $user->_id) {
+            // ✅ Authorization check (only for customers)
+            if ($user->isCustomer() && $payment->user_id !== (string) $user->_id) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Unauthorized',
                 ], 403);
             }
 
+            // ✅ If already completed, return success
             if ($payment->status === 'completed') {
+                $order = Order::where('_id', $payment->order_id)->first();
+
                 return response()->json([
                     'success' => true,
                     'message' => 'Payment already completed',
                     'data' => [
                         'payment_status' => 'completed',
+                        'paid_at' => $payment->paid_at,
+                        'order_status' => $order->status ?? 'unknown',
                     ],
                 ]);
             }
 
-            $service = $this->getPaymentService($payment->payment_method);
-            $status = $service->getPaymentStatus($validated['transaction_id']);
+            // ✅ Use transaction_id from request OR from payment record
+            $transactionId = $validated['transaction_id'] ?? $payment->gateway_transaction_id;
 
-            $isCompleted = in_array($status, ['completed', 'succeeded']);
-            $payment->update([
-                'status' => $status,
-                'paid_at' => $isCompleted ? now() : null,
-            ]);
-
-            if ($isCompleted) {
-                $order = Order::where('_id', $payment->order_id)->first();
-                if ($order) {
-                    $order->update(['status' => 'processing']);
-                }
+            if (!$transactionId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Transaction ID not found',
+                ], 400);
             }
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Payment status confirmed',
-                'data' => [
-                    'payment_status' => $payment->status,
-                ],
+            Log::info('Confirming payment', [
+                'payment_id' => $paymentId,
+                'transaction_id' => $transactionId,
+                'gateway' => $payment->payment_method,
             ]);
+
+            // ✅ Query gateway for status
+            try {
+                $service = $this->getPaymentService($payment->payment_method);
+
+                // ✅ For PayPal, use capturePayment instead of getPaymentStatus
+                if ($payment->payment_method === 'paypal') {
+                    $captureResult = $service->capturePayment($transactionId);
+
+                    if ($captureResult['success']) {
+                        $status = 'completed';
+                    } else {
+                        Log::warning('PayPal capture failed', [
+                            'payment_id' => $paymentId,
+                            'error' => $captureResult['error'] ?? 'Unknown error',
+                        ]);
+                        $status = 'failed';
+                    }
+                } else {
+                    // ✅ For Stripe/PayHere, check status
+                    $status = $service->getPaymentStatus($transactionId);
+                }
+
+                Log::info('Gateway payment status retrieved', [
+                    'payment_id' => $paymentId,
+                    'gateway_status' => $status,
+                ]);
+
+                // ✅ Map gateway status to our status
+                $mappedStatus = match ($status) {
+                    'completed', 'succeeded', 'success' => 'completed',
+                    'processing', 'pending' => 'processing',
+                    'failed', 'canceled', 'cancelled' => 'failed',
+                    default => $payment->status, // Keep current status if unknown
+                };
+
+                $isCompleted = $mappedStatus === 'completed';
+
+                // ✅ Update payment
+                $payment->update([
+                    'status' => $mappedStatus,
+                    'gateway_transaction_id' => $transactionId,
+                    'paid_at' => $isCompleted ? now() : null,
+                ]);
+
+                // ✅ Update order if payment completed
+                $order = Order::where('_id', $payment->order_id)->first();
+
+                if ($isCompleted && $order) {
+                    $order->update([
+                        'payment_status' => 'completed',
+                        'status' => 'processing',
+                        'paid_at' => now(),
+                    ]);
+
+                    Log::info('Order status updated after payment confirmation', [
+                        'order_id' => (string) $order->_id,
+                        'payment_id' => $paymentId,
+                    ]);
+                }
+
+                return response()->json([
+                    'success' => true,
+                    'message' => $isCompleted
+                        ? 'Payment confirmed successfully'
+                        : "Payment status: {$mappedStatus}",
+                    'data' => [
+                        'payment_status' => $mappedStatus,
+                        'paid_at' => $payment->paid_at,
+                        'order_status' => $order->status ?? 'unknown',
+                    ],
+                ]);
+            } catch (\Exception $gatewayError) {
+                Log::error('Gateway status check failed', [
+                    'payment_id' => $paymentId,
+                    'error' => $gatewayError->getMessage(),
+                    'trace' => $gatewayError->getTraceAsString(),
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Could not verify payment with gateway: ' . $gatewayError->getMessage(),
+                    'data' => [
+                        'payment_status' => $payment->status,
+                    ],
+                ], 500);
+            }
         } catch (\Exception $e) {
             Log::error('Payment Confirmation Error', [
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([

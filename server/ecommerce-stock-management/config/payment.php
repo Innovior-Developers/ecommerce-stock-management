@@ -69,19 +69,31 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | PayPal Configuration
+    | PayPal Configuration (srmklive/paypal package format)
     |--------------------------------------------------------------------------
     */
     'paypal' => [
-        'mode' => env('PAYPAL_MODE', 'sandbox'), // sandbox or live
+        'mode' => env('PAYPAL_MODE', 'sandbox'), // Can only be 'sandbox' or 'live'
+
         'sandbox' => [
-            'client_id' => env('PAYPAL_SANDBOX_CLIENT_ID'),
-            'client_secret' => env('PAYPAL_SANDBOX_SECRET'),
+            'client_id' => env('PAYPAL_SANDBOX_CLIENT_ID', ''),
+            'client_secret' => env('PAYPAL_SANDBOX_CLIENT_SECRET', ''),
+            'app_id' => 'APP-80W284485P519543T', // Default sandbox app ID
         ],
+
         'live' => [
-            'client_id' => env('PAYPAL_LIVE_CLIENT_ID'),
-            'client_secret' => env('PAYPAL_LIVE_SECRET'),
+            'client_id' => env('PAYPAL_LIVE_CLIENT_ID', ''),
+            'client_secret' => env('PAYPAL_LIVE_CLIENT_SECRET', ''),
+            'app_id' => env('PAYPAL_LIVE_APP_ID', ''),
         ],
+
+        'payment_action' => env('PAYPAL_PAYMENT_ACTION', 'Sale'), // ✅ CRITICAL: Required by package
+        'currency' => env('PAYPAL_CURRENCY', 'USD'),
+        'notify_url' => env('PAYPAL_NOTIFY_URL', 'http://localhost:8000/api/webhooks/paypal'),
+        'locale' => env('PAYPAL_LOCALE', 'en_US'),
+        'validate_ssl' => env('PAYPAL_VALIDATE_SSL', true),
+
+        // Custom fields for your application
         'webhook_id' => env('PAYPAL_WEBHOOK_ID'),
         'return_url' => env('PAYPAL_RETURN_URL', 'http://localhost:3000/payment/paypal/return'),
         'cancel_url' => env('PAYPAL_CANCEL_URL', 'http://localhost:3000/payment/paypal/cancel'),
