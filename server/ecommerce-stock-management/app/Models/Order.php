@@ -8,10 +8,15 @@ use App\Traits\MongoIdHelper;
 
 class Order extends Model
 {
-    use MongoIdHelper; // ✅ Add this trait
+    use MongoIdHelper;
 
     protected $connection = 'mongodb';
     protected $collection = 'orders';
+
+    // ✅ Ensure primary key settings
+    protected $primaryKey = '_id';
+    protected $keyType = 'string';
+    public $incrementing = false;
 
     protected $fillable = [
         'order_number',
@@ -32,7 +37,8 @@ class Order extends Model
     ];
 
     protected $casts = [
-        '_id' => 'string', // ✅ Add this
+        '_id' => 'string',
+        'customer_id' => 'string',
         'items' => 'array',
         'shipping_address' => 'array',
         'billing_address' => 'array',
@@ -47,23 +53,13 @@ class Order extends Model
         'updated_at' => 'datetime',
     ];
 
-    // Fixed relationship - should reference Customer, not User
+    // ✅ REMOVE: Don't override getIdAttribute() - MongoDB handles this
+    // ✅ REMOVE: Don't override getKey() - let parent class handle it
+
+    // Relationships
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class, 'customer_id', '_id');
-    }
-
-    // Relationship to user through customer
-    public function user()
-    {
-        return $this->hasOneThrough(
-            User::class,
-            Customer::class,
-            '_id',      // Foreign key on customers table
-            '_id',      // Foreign key on users table
-            'customer_id', // Local key on orders table
-            'user_id'   // Local key on customers table
-        );
     }
 
     // Scopes

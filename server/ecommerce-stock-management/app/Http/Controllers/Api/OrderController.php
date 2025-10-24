@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Customer;
+use App\Models\Product;
+use App\Models\Payment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -13,20 +15,21 @@ use App\Services\QuerySanitizer;
 
 class OrderController extends Controller
 {
+    /**
+     * Admin views all orders
+     */
     public function index(Request $request)
     {
         try {
             $query = Order::with(['customer.user']);
 
-            // ✅ SANITIZE status filter
+            // Sanitize status filter
             if ($request->has('status')) {
                 $status = QuerySanitizer::sanitize($request->get('status'));
-                if (in_array($status, ['pending', 'processing', 'shipped', 'delivered', 'cancelled'])) {
-                    $query->where('status', $status);
-                }
+                $query->where('status', $status);
             }
 
-            // ✅ SANITIZE customer_id filter
+            // Sanitize customer_id filter
             if ($request->has('customer_id')) {
                 $customerId = QuerySanitizer::sanitizeMongoId($request->get('customer_id'));
                 if ($customerId) {
@@ -36,39 +39,40 @@ class OrderController extends Controller
 
             // Date filters
             if ($request->has('date_from')) {
-                $query->where('created_at', '>=', $request->date_from);
+                $dateFrom = QuerySanitizer::sanitize($request->get('date_from'));
+                $query->where('created_at', '>=', $dateFrom);
             }
 
             if ($request->has('date_to')) {
-                $query->where('created_at', '<=', $request->date_to);
+                $dateTo = QuerySanitizer::sanitize($request->get('date_to'));
+                $query->where('created_at', '<=', $dateTo);
             }
 
             $orders = $query->latest()->get();
 
-            // ✅ Ensure consistent ID format
             $ordersData = $orders->map(function ($order) {
+                $payment = Payment::where('order_id', (string) $order->_id)
+                    ->orderBy('created_at', 'desc')
+                    ->first();
+
                 return [
-                    '_id' => $order->_id,
-                    'id' => $order->_id, // ✅ Include both
+                    '_id' => (string) $order->_id,
                     'order_number' => $order->order_number,
-                    'customer_id' => $order->customer_id,
-                    'customer' => $order->customer ? [
-                        '_id' => $order->customer->_id,
-                        'id' => $order->customer->_id,
-                        'name' => $order->customer->getFullNameAttribute(),
-                        'email' => $order->customer->user->email ?? null,
-                    ] : null,
+                    'customer' => [
+                        '_id' => (string) ($order->customer->_id ?? ''),
+                        'name' => ($order->customer->first_name ?? '') . ' ' . ($order->customer->last_name ?? ''),
+                        'email' => $order->customer->user->email ?? '',
+                    ],
                     'items' => $order->items,
                     'shipping_address' => $order->shipping_address,
-                    'billing_address' => $order->billing_address,
-                    'payment' => $order->payment,
-                    'status' => $order->status,
                     'subtotal' => $order->subtotal,
                     'tax' => $order->tax,
                     'shipping_cost' => $order->shipping_cost,
                     'total' => $order->total,
-                    'notes' => $order->notes,
-                    'tracking_number' => $order->tracking_number,
+                    'status' => $order->status,
+                    'payment_status' => $payment?->status ?? 'unpaid',
+                    'payment_method' => $payment?->payment_method,
+                    'paid_at' => $payment?->paid_at,
                     'created_at' => $order->created_at,
                     'updated_at' => $order->updated_at,
                 ];
@@ -87,13 +91,123 @@ class OrderController extends Controller
         }
     }
 
+    /**
+     * Customer views their own orders
+     */
+    public function myOrders(Request $request)
+    {
+        try {
+            $user = $request->user();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Authentication required',
+                ], 401);
+            }
+
+            $customer = Customer::where('user_id', (string) $user->_id)->first();
+
+            if (!$customer) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Customer profile not found',
+                ], 404);
+            }
+
+            $query = Order::where('customer_id', (string) $customer->_id);
+
+            if ($request->has('status')) {
+                $status = QuerySanitizer::sanitize($request->get('status'));
+                if (in_array($status, ['pending', 'processing', 'shipped', 'delivered', 'cancelled'])) {
+                    $query->where('status', $status);
+                }
+            }
+
+            $orders = $query->orderBy('created_at', 'desc')->get();
+
+            $ordersData = $orders->map(function ($order) {
+                $payment = Payment::where('order_id', (string) $order->_id)
+                    ->orderBy('created_at', 'desc')
+                    ->first();
+
+                return [
+                    '_id' => (string) $order->_id,
+                    'order_number' => $order->order_number,
+                    'items' => $order->items,
+                    'shipping_address' => $order->shipping_address,
+                    'subtotal' => $order->subtotal,
+                    'tax' => $order->tax,
+                    'shipping_cost' => $order->shipping_cost,
+                    'total' => $order->total,
+                    'status' => $order->status,
+                    'payment_status' => $payment?->status ?? 'unpaid',
+                    'payment_method' => $payment?->payment_method,
+                    'paid_at' => $payment?->paid_at,
+                    'created_at' => $order->created_at,
+                    'updated_at' => $order->updated_at,
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => $ordersData,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching customer orders: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch orders',
+            ], 500);
+        }
+    }
+
+    /**
+     * ✅ FIXED: Customer creates order with proper _id retrieval
+     */
     public function store(Request $request)
     {
         try {
+            Log::info('=== ORDER CREATION REQUEST START ===');
+            Log::info('Request data:', $request->all());
+
+            $user = $request->user();
+
+            if (!$user) {
+                Log::error('User not authenticated');
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Authentication required',
+                ], 401);
+            }
+
+            Log::info('Authenticated user:', [
+                'user_id' => (string) $user->_id,
+                'user_email' => $user->email,
+            ]);
+
+            $customer = Customer::where('user_id', (string) $user->_id)->first();
+
+            if (!$customer) {
+                Log::error('Customer profile not found', [
+                    'user_id' => (string) $user->_id,
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Customer profile not found. Please complete your profile first.',
+                ], 404);
+            }
+
+            Log::info('Customer found:', [
+                'customer_id' => (string) $customer->_id,
+                'customer_name' => $customer->first_name . ' ' . $customer->last_name,
+            ]);
+
             $validated = $request->validate([
-                'customer_id' => 'required|string',
                 'items' => 'required|array|min:1',
                 'items.*.product_id' => 'required|string',
+                'items.*.product_name' => 'nullable|string',
                 'items.*.quantity' => 'required|integer|min:1',
                 'items.*.unit_price' => 'required|numeric|min:0',
                 'shipping_address' => 'required|array',
@@ -102,51 +216,83 @@ class OrderController extends Controller
                 'shipping_address.country' => 'required|string',
                 'shipping_address.postal_code' => 'required|string',
                 'payment' => 'required|array',
-                'payment.method' => 'required|string',
+                'payment.method' => 'required|in:stripe,paypal,payhere',
                 'notes' => 'nullable|string',
             ]);
 
-            // ✅ VALIDATE customer_id
-            $customerId = QuerySanitizer::sanitizeMongoId($validated['customer_id']);
-            if (!$customerId) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid customer ID format'
-                ], 400);
-            }
+            Log::info('Validation passed');
 
-            // ✅ Verify customer exists
-            if (!Customer::where('_id', $customerId)->exists()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Customer not found'
-                ], 404);
-            }
-
-            // ✅ SANITIZE and validate product IDs in items
             foreach ($validated['items'] as $key => $item) {
                 $productId = QuerySanitizer::sanitizeMongoId($item['product_id']);
                 if (!$productId) {
+                    Log::error('Invalid product ID', [
+                        'index' => $key,
+                        'product_id' => $item['product_id'],
+                    ]);
+
                     return response()->json([
                         'success' => false,
-                        'message' => "Invalid product ID in item {$key}"
+                        'message' => "Invalid product ID in item {$key}",
                     ], 400);
                 }
+
+                $product = Product::where('_id', $productId)->first();
+
+                if (!$product) {
+                    Log::error('Product not found', [
+                        'index' => $key,
+                        'product_id' => $productId,
+                    ]);
+
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Product not found for item {$key}",
+                    ], 404);
+                }
+
+                if (empty($item['product_name'])) {
+                    $validated['items'][$key]['product_name'] = $product->name;
+                }
+
+                if ($product->stock_quantity < $item['quantity']) {
+                    Log::error('Insufficient stock', [
+                        'product_id' => $productId,
+                        'requested' => $item['quantity'],
+                        'available' => $product->stock_quantity,
+                    ]);
+
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Insufficient stock for {$product->name}. Available: {$product->stock_quantity}",
+                    ], 400);
+                }
+
                 $validated['items'][$key]['product_id'] = $productId;
+                $validated['items'][$key]['subtotal'] = $item['quantity'] * $item['unit_price'];
             }
 
-            // Calculate totals
+            Log::info('Product IDs sanitized and verified');
+
             $subtotal = 0;
             foreach ($validated['items'] as $item) {
                 $subtotal += $item['quantity'] * $item['unit_price'];
             }
 
-            $tax = $subtotal * 0.1; // 10% tax
-            $shipping_cost = 10.00; // Fixed shipping
-            $total = $subtotal + $tax + $shipping_cost;
+            $tax = round($subtotal * 0.08, 2);
+            $shipping_cost = $subtotal > 100 ? 0 : 15.99;
+            $total = round($subtotal + $tax + $shipping_cost, 2);
 
-            $order = Order::create([
-                'order_number' => 'ORD-' . strtoupper(Str::random(8)),
+            Log::info('Totals calculated:', [
+                'subtotal' => $subtotal,
+                'tax' => $tax,
+                'shipping_cost' => $shipping_cost,
+                'total' => $total,
+            ]);
+
+            $customerId = (string) $customer->_id;
+
+            $orderData = [
+                'order_number' => 'ORD-' . strtoupper(Str::random(10)),
                 'customer_id' => $customerId,
                 'items' => $validated['items'],
                 'shipping_address' => $validated['shipping_address'],
@@ -158,26 +304,64 @@ class OrderController extends Controller
                 'shipping_cost' => $shipping_cost,
                 'total' => $total,
                 'notes' => $validated['notes'] ?? null,
+            ];
+
+            Log::info('Order data prepared:', $orderData);
+
+            // ✅ FIX: Create order and immediately retrieve fresh copy
+            $order = Order::create($orderData);
+
+            // ✅ FIX: Query the order again by order_number to ensure _id is populated
+            $order = Order::where('order_number', $order->order_number)->first();
+
+            if (!$order || !$order->_id) {
+                Log::error('Order creation failed - _id not populated', [
+                    'order_number' => $orderData['order_number'],
+                ]);
+                throw new \Exception('Order creation failed: ID not generated');
+            }
+
+            $orderId = (string) $order->_id;
+
+            Log::info('Order created successfully:', [
+                'order_id' => $orderId,
+                'order_number' => $order->order_number,
             ]);
 
             Cache::flush();
+
+            Log::info('=== ORDER CREATION REQUEST END ===');
 
             return response()->json([
                 'success' => true,
                 'message' => 'Order created successfully',
                 'data' => [
-                    '_id' => $order->_id,
-                    'id' => $order->_id,
+                    '_id' => $orderId,
                     'order_number' => $order->order_number,
-                    'total' => $order->total,
+                    'total' => (string) $order->total,
                     'status' => $order->status,
+                    'items_count' => count($order->items),
                 ],
             ], 201);
-        } catch (\Exception $e) {
-            Log::error('Error creating order: ' . $e->getMessage());
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::error('Validation error:', [
+                'errors' => $e->errors(),
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to create order'
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Order creation exception:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create order: ' . $e->getMessage(),
             ], 500);
         }
     }
@@ -185,50 +369,49 @@ class OrderController extends Controller
     public function show($id)
     {
         try {
-            // ✅ VALIDATE and SANITIZE ID
             $sanitizedId = QuerySanitizer::sanitizeMongoId($id);
-
             if (!$sanitizedId) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Invalid order ID format'
+                    'message' => 'Invalid order ID',
                 ], 400);
             }
 
-            $order = Order::with('customer.user')
-                ->where('_id', $sanitizedId)
-                ->first();
+            $order = Order::with('customer.user')->find($sanitizedId);
 
             if (!$order) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Order not found'
+                    'message' => 'Order not found',
                 ], 404);
             }
+
+            $payment = Payment::where('order_id', $sanitizedId)
+                ->orderBy('created_at', 'desc')
+                ->first();
 
             return response()->json([
                 'success' => true,
                 'data' => [
-                    '_id' => $order->_id,
-                    'id' => $order->_id,
+                    '_id' => (string) $order->_id,
                     'order_number' => $order->order_number,
-                    'customer' => $order->customer ? [
-                        '_id' => $order->customer->_id,
-                        'id' => $order->customer->_id,
-                        'name' => $order->customer->getFullNameAttribute(),
-                        'email' => $order->customer->user->email ?? null,
-                    ] : null,
+                    'customer' => [
+                        'name' => ($order->customer->first_name ?? '') . ' ' . ($order->customer->last_name ?? ''),
+                        'email' => $order->customer->user->email ?? '',
+                    ],
                     'items' => $order->items,
                     'shipping_address' => $order->shipping_address,
                     'billing_address' => $order->billing_address,
-                    'payment' => $order->payment,
-                    'status' => $order->status,
                     'subtotal' => $order->subtotal,
                     'tax' => $order->tax,
                     'shipping_cost' => $order->shipping_cost,
                     'total' => $order->total,
-                    'notes' => $order->notes,
+                    'status' => $order->status,
+                    'payment_status' => $payment?->status ?? 'unpaid',
+                    'payment_method' => $payment?->payment_method,
+                    'paid_at' => $payment?->paid_at,
                     'tracking_number' => $order->tracking_number,
+                    'notes' => $order->notes,
                     'created_at' => $order->created_at,
                     'updated_at' => $order->updated_at,
                 ],
@@ -237,7 +420,7 @@ class OrderController extends Controller
             Log::error('Error fetching order: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to fetch order'
+                'message' => 'Failed to fetch order',
             ], 500);
         }
     }
@@ -245,73 +428,46 @@ class OrderController extends Controller
     public function update(Request $request, $id)
     {
         try {
-            // ✅ VALIDATE and SANITIZE ID
             $sanitizedId = QuerySanitizer::sanitizeMongoId($id);
-
             if (!$sanitizedId) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Invalid order ID format'
+                    'message' => 'Invalid order ID',
                 ], 400);
             }
 
-            $order = Order::where('_id', $sanitizedId)->first();
+            $order = Order::find($sanitizedId);
 
             if (!$order) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Order not found'
+                    'message' => 'Order not found',
                 ], 404);
             }
 
             $validated = $request->validate([
-                'status' => 'sometimes|string|in:pending,processing,shipped,delivered,cancelled',
-                'payment' => 'sometimes|array',
-                'payment.status' => 'sometimes|string|in:pending,paid,failed,refunded',
-                'shipping_address' => 'sometimes|array',
-                'tracking_number' => 'nullable|string',
-                'notes' => 'nullable|string',
+                'status' => 'sometimes|in:pending,processing,shipped,delivered,cancelled',
+                'tracking_number' => 'sometimes|nullable|string',
+                'notes' => 'sometimes|nullable|string',
             ]);
-
-            // ✅ SANITIZE string inputs
-            if (isset($validated['tracking_number'])) {
-                $validated['tracking_number'] = QuerySanitizer::sanitize($validated['tracking_number']);
-            }
-            if (isset($validated['notes'])) {
-                $validated['notes'] = QuerySanitizer::sanitize($validated['notes']);
-            }
-
-            // Update timestamps based on status
-            if (isset($validated['status'])) {
-                if ($validated['status'] === 'shipped' && !$order->shipped_at) {
-                    $validated['shipped_at'] = now();
-                }
-                if ($validated['status'] === 'delivered' && !$order->delivered_at) {
-                    $validated['delivered_at'] = now();
-                }
-            }
 
             $order->update($validated);
 
-            Cache::forget("order_{$sanitizedId}");
-            Cache::flush();
+            Log::info('Order updated', ['order_id' => $sanitizedId]);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Order updated successfully',
                 'data' => [
-                    '_id' => $order->_id,
-                    'id' => $order->_id,
-                    'order_number' => $order->order_number,
+                    '_id' => (string) $order->_id,
                     'status' => $order->status,
-                    'updated_at' => $order->updated_at,
                 ],
             ]);
         } catch (\Exception $e) {
-            Log::error('Error updating order: ' . $e->getMessage());
+            Log::error('Order update failed', ['error' => $e->getMessage()]);
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update order'
+                'message' => 'Failed to update order',
             ], 500);
         }
     }
@@ -319,47 +475,36 @@ class OrderController extends Controller
     public function destroy($id)
     {
         try {
-            // ✅ VALIDATE and SANITIZE ID
             $sanitizedId = QuerySanitizer::sanitizeMongoId($id);
-
             if (!$sanitizedId) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Invalid order ID format'
+                    'message' => 'Invalid order ID',
                 ], 400);
             }
 
-            $order = Order::where('_id', $sanitizedId)->first();
+            $order = Order::find($sanitizedId);
 
             if (!$order) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Order not found'
+                    'message' => 'Order not found',
                 ], 404);
-            }
-
-            // Only allow deletion of pending orders
-            if ($order->status !== 'pending') {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Cannot delete order that is not in pending status'
-                ], 400);
             }
 
             $order->delete();
 
-            Cache::forget("order_{$sanitizedId}");
-            Cache::flush();
+            Log::info('Order deleted', ['order_id' => $sanitizedId]);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Order deleted successfully'
+                'message' => 'Order deleted successfully',
             ]);
         } catch (\Exception $e) {
-            Log::error('Error deleting order: ' . $e->getMessage());
+            Log::error('Order deletion failed', ['error' => $e->getMessage()]);
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to delete order'
+                'message' => 'Failed to delete order',
             ], 500);
         }
     }

@@ -20,7 +20,7 @@ class PaymentController extends Controller
      */
     private function getPaymentService(string $gateway)
     {
-        return match($gateway) {
+        return match ($gateway) {
             'stripe' => app(StripeService::class),
             'paypal' => app(PayPalService::class),
             'payhere' => app(PayHereService::class),
@@ -119,11 +119,15 @@ class PaymentController extends Controller
             // ✅ Create payment record
             $payment = Payment::create([
                 'order_id' => $orderId,
-                'user_id' => (string) $user->_id,
+                'user_id' => (string) $user->_id, // ✅ From JWT token
                 'amount' => $order->total,
                 'currency' => $validated['currency'],
                 'payment_method' => $validated['payment_method'],
                 'status' => 'pending',
+                'metadata' => [
+                    'order_number' => $order->order_number,
+                    'customer_name' => $user->name,
+                ],
                 'ip_address' => $request->ip(),
                 'user_agent' => $request->userAgent(),
             ]);
@@ -185,7 +189,6 @@ class PaymentController extends Controller
                 'success' => false,
                 'message' => $result['error'] ?? 'Payment initialization failed',
             ], 500);
-
         } catch (\Exception $e) {
             Log::error('Payment Initiation Exception', [
                 'error' => $e->getMessage(),
@@ -300,7 +303,6 @@ class PaymentController extends Controller
                     'payment_status' => $payment->status,
                 ],
             ]);
-
         } catch (\Exception $e) {
             Log::error('Payment Confirmation Error', [
                 'error' => $e->getMessage(),
@@ -373,7 +375,6 @@ class PaymentController extends Controller
                     'created_at' => $payment->created_at,
                 ],
             ]);
-
         } catch (\Exception $e) {
             Log::error('Payment Status Error', [
                 'error' => $e->getMessage(),
@@ -419,7 +420,6 @@ class PaymentController extends Controller
                     'total' => $payments->total(),
                 ],
             ]);
-
         } catch (\Exception $e) {
             Log::error('Payment History Error', [
                 'error' => $e->getMessage(),
