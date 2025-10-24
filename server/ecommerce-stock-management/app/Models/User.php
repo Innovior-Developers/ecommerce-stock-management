@@ -37,16 +37,31 @@ class User extends Authenticatable implements JWTSubject
     // JWT methods
     public function getJWTIdentifier()
     {
-        // Always return string representation of _id
         return (string) $this->_id;
     }
 
     public function getJWTCustomClaims()
     {
-        // Return empty array to avoid claim issues
         return [];
     }
 
+    // ✅ ADD: Role checking helper methods
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
+
+    public function isCustomer(): bool
+    {
+        return $this->role === 'customer';
+    }
+
+    public function hasRole(string $role): bool
+    {
+        return $this->role === $role;
+    }
+
+    // Relationships
     public function customer()
     {
         return $this->hasOne(Customer::class, 'user_id', '_id');

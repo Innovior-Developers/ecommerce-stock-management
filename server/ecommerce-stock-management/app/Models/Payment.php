@@ -13,29 +13,35 @@ class Payment extends Model
     protected $connection = 'mongodb';
     protected $collection = 'payments';
 
+    protected $primaryKey = '_id';
+    protected $keyType = 'string';
+    public $incrementing = false;
+
     protected $fillable = [
         'order_id',
         'user_id',
         'amount',
         'currency',
-        'payment_method', // stripe, paypal, payhere
-        'status', // pending, processing, completed, failed, refunded
+        'payment_method',
+        'status',
         'gateway_transaction_id',
         'gateway_response',
-        'metadata',
         'paid_at',
-        'refunded_at',
-        'refund_reason',
+        'metadata',
         'ip_address',
         'user_agent',
     ];
 
     protected $casts = [
-        'amount' => 'decimal:2',
+        '_id' => 'string',
+        'order_id' => 'string',
+        'user_id' => 'string',
+        'amount' => 'float',
         'gateway_response' => 'array',
         'metadata' => 'array',
         'paid_at' => 'datetime',
-        'refunded_at' => 'datetime',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
     // Relationships
@@ -70,35 +76,53 @@ class Payment extends Model
         return $query->where('status', 'failed');
     }
 
-    public function scopeRefunded($query)
-    {
-        return $query->where('status', 'refunded');
-    }
-
     public function scopeByGateway($query, string $gateway)
     {
         return $query->where('payment_method', $gateway);
     }
 
-    // Accessors
-    public function getIsCompletedAttribute(): bool
+    public function scopeByDateRange($query, $from, $to)
+    {
+        return $query->whereBetween('created_at', [$from, $to]);
+    }
+
+    // Helper Methods
+    public function isPending(): bool
+    {
+        return $this->status === 'pending';
+    }
+
+    public function isCompleted(): bool
     {
         return $this->status === 'completed';
     }
 
-    public function getIsPendingAttribute(): bool
+    public function isFailed(): bool
     {
-        return in_array($this->status, ['pending', 'processing']);
+        return $this->status === 'failed';
     }
 
-    public function getCanRefundAttribute(): bool
+    public function isProcessing(): bool
     {
-        return $this->status === 'completed' && !$this->refunded_at;
+        return $this->status === 'processing';
     }
 
-    // Mutators
-    public function setAmountAttribute($value)
+    public function markAsCompleted(): void
     {
-        $this->attributes['amount'] = round((float) $value, 2);
+        $this->update([
+            'status' => 'completed',
+            'paid_at' => now(),
+        ]);
+    }
+
+    public function markAsFailed(string $reason = null): void
+    {
+        $this->update([
+            'status' => 'failed',
+            'metadata' => array_merge($this->metadata ?? [], [
+                'failure_reason' => $reason,
+                'failed_at' => now()->toDateTimeString(),
+            ]),
+        ]);
     }
 }

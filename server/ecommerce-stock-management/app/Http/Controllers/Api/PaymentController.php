@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Models\Order;
+use App\Models\Customer;
 use App\Services\PaymentGateway\StripeService;
 use App\Services\PaymentGateway\PayPalService;
 use App\Services\PaymentGateway\PayHereService;
@@ -15,21 +16,50 @@ use Illuminate\Support\Facades\Validator;
 
 class PaymentController extends Controller
 {
-    /**
-     * Get appropriate payment service based on gateway
-     */
-    private function getPaymentService(string $gateway)
+    private function getPaymentService(string $method)
     {
-        return match ($gateway) {
-            'stripe' => app(StripeService::class),
-            'paypal' => app(PayPalService::class),
-            'payhere' => app(PayHereService::class),
-            default => throw new \Exception('Invalid payment gateway'),
+        return match ($method) {
+            'stripe' => new StripeService(),
+            'paypal' => new PayPalService(),
+            'payhere' => new PayHereService(),
+            default => throw new \InvalidArgumentException("Unsupported payment method: {$method}"),
         };
     }
 
     /**
-     * Initialize payment
+     * ✅ HELPER: Force convert to float (handles Decimal128, strings, numbers)
+     */
+    private function forceFloat($value): float
+    {
+        // Log what we receive
+        Log::info('forceFloat called', [
+            'value' => $value,
+            'type' => gettype($value),
+            'class' => is_object($value) ? get_class($value) : 'not_object',
+        ]);
+
+        // Handle Decimal128 objects
+        if (is_object($value)) {
+            if (method_exists($value, '__toString')) {
+                $stringValue = $value->__toString();
+                Log::info('Converted object to string', ['string_value' => $stringValue]);
+                return (float) $stringValue;
+            }
+            // Try to cast object directly
+            return (float) (string) $value;
+        }
+
+        // Handle strings
+        if (is_string($value)) {
+            return (float) $value;
+        }
+
+        // Handle numeric values
+        return (float) $value;
+    }
+
+    /**
+     * Initiate payment
      * POST /api/payment/initiate
      */
     public function initiate(Request $request)
@@ -52,7 +82,7 @@ class PaymentController extends Controller
 
             $validated = $validator->validated();
 
-            // ✅ Get authenticated user (set by JWTMiddleware)
+            // ✅ Get authenticated user
             $user = $request->user();
 
             if (!$user) {
@@ -80,18 +110,47 @@ class PaymentController extends Controller
                 ], 404);
             }
 
-            // ✅ Verify user owns this order
-            if ($user->isCustomer() && (!$user->customer || $order->customer_id !== $user->customer->_id)) {
-                Log::warning('Payment initiation unauthorized', [
-                    'user_id' => (string) $user->_id,
-                    'order_id' => $orderId,
-                    'order_customer_id' => (string) $order->customer_id,
-                ]);
+            // ✅ DEBUG: Log raw order total
+            Log::info('Raw order total', [
+                'raw_total' => $order->total,
+                'type' => gettype($order->total),
+                'class' => is_object($order->total) ? get_class($order->total) : 'not_object',
+            ]);
 
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unauthorized to pay for this order',
-                ], 403);
+            // ✅ FIX: Force convert using helper
+            $orderTotal = $this->forceFloat($order->total);
+
+            Log::info('Payment initiation started', [
+                'order_id' => $orderId,
+                'raw_total' => $order->total,
+                'converted_total' => $orderTotal,
+                'total_type' => gettype($orderTotal),
+                'currency' => $validated['currency'],
+                'gateway' => $validated['payment_method'],
+            ]);
+
+            // ✅ Verify user owns this order (for customers only)
+            if ($user->isCustomer()) {
+                $customer = Customer::where('user_id', (string) $user->_id)->first();
+
+                if (!$customer) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Customer profile not found',
+                    ], 404);
+                }
+
+                if ($order->customer_id !== (string) $customer->_id) {
+                    Log::warning('Payment initiation unauthorized', [
+                        'user_id' => (string) $user->_id,
+                        'order_id' => $orderId,
+                    ]);
+
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Unauthorized to pay for this order',
+                    ], 403);
+                }
             }
 
             // ✅ Check if order already has a completed payment
@@ -106,47 +165,88 @@ class PaymentController extends Controller
                 ], 400);
             }
 
-            // ✅ Verify currency matches gateway
-            $expectedGateway = config("payment.currency_gateway_map.{$validated['currency']}", 'stripe');
-            if ($validated['payment_method'] !== $expectedGateway) {
-                Log::warning('Currency gateway mismatch', [
-                    'currency' => $validated['currency'],
-                    'selected_gateway' => $validated['payment_method'],
-                    'recommended_gateway' => $expectedGateway,
-                ]);
+            // ✅ Get customer data for payment gateway
+            $customerData = [
+                'first_name' => $user->name ?? 'Customer',
+                'last_name' => '',
+                'email' => $user->email,
+                'phone' => '',
+            ];
+
+            if ($user->isCustomer()) {
+                $customer = Customer::where('user_id', (string) $user->_id)->first();
+                if ($customer) {
+                    $customerData = [
+                        'first_name' => $customer->first_name ?? $user->name ?? 'Customer',
+                        'last_name' => $customer->last_name ?? '',
+                        'email' => $user->email,
+                        'phone' => $customer->phone ?? '',
+                    ];
+                }
             }
 
-            // ✅ Create payment record
+            // ✅ MINIMAL FIX: Create payment and get ID immediately
             $payment = Payment::create([
                 'order_id' => $orderId,
-                'user_id' => (string) $user->_id, // ✅ From JWT token
-                'amount' => $order->total,
+                'user_id' => (string) $user->_id,
+                'amount' => $orderTotal,
                 'currency' => $validated['currency'],
                 'payment_method' => $validated['payment_method'],
                 'status' => 'pending',
                 'metadata' => [
                     'order_number' => $order->order_number,
-                    'customer_name' => $user->name,
+                    'customer_name' => trim($customerData['first_name'] . ' ' . $customerData['last_name']),
                 ],
                 'ip_address' => $request->ip(),
                 'user_agent' => $request->userAgent(),
             ]);
 
-            // ✅ Initialize payment with gateway
-            $service = $this->getPaymentService($validated['payment_method']);
-            $result = $service->createPayment([
+            // ✅ FIX: Get the actual ID from database
+            $paymentId = $payment->getKey();
+
+            // ✅ FALLBACK: If still empty, query by order_id
+            if (empty($paymentId)) {
+                $payment = Payment::where('order_id', $orderId)
+                    ->where('user_id', (string) $user->_id)
+                    ->orderBy('created_at', 'desc')
+                    ->first();
+
+                if ($payment) {
+                    $paymentId = (string) $payment->_id;
+                }
+            } else {
+                $paymentId = (string) $paymentId;
+            }
+
+            Log::info('Payment record created', [
+                'payment_id' => $paymentId,
+                'order_id' => $orderId,
+            ]);
+
+            // ✅ DEBUG: Log what we're sending to gateway
+            $gatewayData = [
                 'order_id' => $orderId,
                 'user_id' => (string) $user->_id,
-                'amount' => $order->total,
+                'amount' => $orderTotal,
                 'currency' => $validated['currency'],
-                'first_name' => $user->customer->first_name ?? $user->name ?? 'Customer',
-                'last_name' => $user->customer->last_name ?? '',
-                'email' => $user->email,
-                'phone' => $user->customer->phone ?? '',
+                'first_name' => $customerData['first_name'],
+                'last_name' => $customerData['last_name'],
+                'email' => $customerData['email'],
+                'phone' => $customerData['phone'],
                 'address' => $order->shipping_address['street'] ?? '',
                 'city' => $order->shipping_address['city'] ?? 'City',
                 'items_description' => "Order #{$order->order_number}",
+            ];
+
+            Log::info('Gateway data prepared', [
+                'amount' => $gatewayData['amount'],
+                'amount_type' => gettype($gatewayData['amount']),
+                'gateway' => $validated['payment_method'],
             ]);
+
+            // ✅ Initialize payment with gateway
+            $service = $this->getPaymentService($validated['payment_method']);
+            $result = $service->createPayment($gatewayData);
 
             if ($result['success']) {
                 // ✅ Update payment with gateway transaction ID
@@ -157,22 +257,22 @@ class PaymentController extends Controller
                 ]);
 
                 Log::info('Payment initiated successfully', [
-                    'payment_id' => (string) $payment->_id,
+                    'payment_id' => $paymentId,
                     'order_id' => $orderId,
                     'gateway' => $validated['payment_method'],
-                    'amount' => $order->total,
+                    'amount' => $orderTotal,
                 ]);
 
                 return response()->json([
                     'success' => true,
                     'message' => 'Payment initiated successfully',
                     'data' => [
-                        'payment_id' => (string) $payment->_id,
+                        'payment_id' => $paymentId, // ✅ NOW POPULATED
                         'transaction_id' => $result['transaction_id'],
-                        'client_secret' => $result['client_secret'] ?? null, // Stripe
-                        'approval_url' => $result['approval_url'] ?? null,   // PayPal
-                        'payment_data' => $result['payment_data'] ?? null,   // PayHere
-                        'action_url' => $result['action_url'] ?? null,       // PayHere
+                        'client_secret' => $result['client_secret'] ?? null,
+                        'approval_url' => $result['approval_url'] ?? null,
+                        'payment_data' => $result['payment_data'] ?? null,
+                        'action_url' => $result['action_url'] ?? null,
                     ],
                 ]);
             }
@@ -181,7 +281,7 @@ class PaymentController extends Controller
             $payment->update(['status' => 'failed']);
 
             Log::error('Payment initiation failed', [
-                'payment_id' => (string) $payment->_id,
+                'payment_id' => $paymentId,
                 'error' => $result['error'] ?? 'Unknown error',
             ]);
 
@@ -197,7 +297,7 @@ class PaymentController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Payment initialization failed',
+                'message' => 'Payment initialization failed: ' . $e->getMessage(),
             ], 500);
         }
     }
@@ -209,7 +309,6 @@ class PaymentController extends Controller
     public function confirm(Request $request)
     {
         try {
-            // ✅ Validate request
             $validator = Validator::make($request->all(), [
                 'payment_id' => 'required|string',
                 'transaction_id' => 'required|string',
@@ -224,8 +323,6 @@ class PaymentController extends Controller
             }
 
             $validated = $validator->validated();
-
-            // ✅ Get authenticated user
             $user = $request->user();
 
             if (!$user) {
@@ -235,7 +332,6 @@ class PaymentController extends Controller
                 ], 401);
             }
 
-            // ✅ Sanitize payment ID
             $paymentId = QuerySanitizer::sanitizeMongoId($validated['payment_id']);
             if (!$paymentId) {
                 return response()->json([
@@ -244,7 +340,6 @@ class PaymentController extends Controller
                 ], 400);
             }
 
-            // ✅ Fetch payment
             $payment = Payment::where('_id', $paymentId)->first();
             if (!$payment) {
                 return response()->json([
@@ -253,7 +348,6 @@ class PaymentController extends Controller
                 ], 404);
             }
 
-            // ✅ Verify user owns this payment
             if ($payment->user_id !== (string) $user->_id) {
                 return response()->json([
                     'success' => false,
@@ -261,7 +355,6 @@ class PaymentController extends Controller
                 ], 403);
             }
 
-            // ✅ Check if payment already completed
             if ($payment->status === 'completed') {
                 return response()->json([
                     'success' => true,
@@ -272,27 +365,19 @@ class PaymentController extends Controller
                 ]);
             }
 
-            // ✅ Get payment status from gateway
             $service = $this->getPaymentService($payment->payment_method);
             $status = $service->getPaymentStatus($validated['transaction_id']);
 
-            // ✅ Update payment status
             $isCompleted = in_array($status, ['completed', 'succeeded']);
             $payment->update([
                 'status' => $status,
                 'paid_at' => $isCompleted ? now() : null,
             ]);
 
-            // ✅ Update order status if payment completed
             if ($isCompleted) {
                 $order = Order::where('_id', $payment->order_id)->first();
                 if ($order) {
                     $order->update(['status' => 'processing']);
-
-                    Log::info('Order status updated after payment', [
-                        'order_id' => (string) $order->_id,
-                        'payment_id' => (string) $payment->_id,
-                    ]);
                 }
             }
 
@@ -322,7 +407,6 @@ class PaymentController extends Controller
     public function status(Request $request, $id)
     {
         try {
-            // ✅ Get authenticated user
             $user = $request->user();
 
             if (!$user) {
@@ -332,7 +416,6 @@ class PaymentController extends Controller
                 ], 401);
             }
 
-            // ✅ Sanitize payment ID
             $paymentId = QuerySanitizer::sanitizeMongoId($id);
             if (!$paymentId) {
                 return response()->json([
@@ -341,7 +424,6 @@ class PaymentController extends Controller
                 ], 400);
             }
 
-            // ✅ Fetch payment
             $payment = Payment::where('_id', $paymentId)
                 ->with('order')
                 ->first();
@@ -353,7 +435,6 @@ class PaymentController extends Controller
                 ], 404);
             }
 
-            // ✅ Verify user owns this payment
             if ($payment->user_id !== (string) $user->_id) {
                 return response()->json([
                     'success' => false,

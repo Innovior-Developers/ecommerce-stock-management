@@ -13,7 +13,6 @@ class Order extends Model
     protected $connection = 'mongodb';
     protected $collection = 'orders';
 
-    // ✅ Ensure primary key settings
     protected $primaryKey = '_id';
     protected $keyType = 'string';
     public $incrementing = false;
@@ -43,18 +42,16 @@ class Order extends Model
         'shipping_address' => 'array',
         'billing_address' => 'array',
         'payment' => 'array',
-        'subtotal' => 'decimal:2',
-        'tax' => 'decimal:2',
-        'shipping_cost' => 'decimal:2',
-        'total' => 'decimal:2',
+        // ✅ FIX: Store as float, not decimal
+        'subtotal' => 'float',
+        'tax' => 'float',
+        'shipping_cost' => 'float',
+        'total' => 'float',
         'shipped_at' => 'datetime',
         'delivered_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
-
-    // ✅ REMOVE: Don't override getIdAttribute() - MongoDB handles this
-    // ✅ REMOVE: Don't override getKey() - let parent class handle it
 
     // Relationships
     public function customer(): BelongsTo

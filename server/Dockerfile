@@ -27,9 +27,16 @@ RUN apt-get update && apt-get install -y \
 # Install PHP extensions
 RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip curl
 
-# Install MongoDB and Redis PHP extensions
-RUN pecl install mongodb redis \
-    && docker-php-ext-enable mongodb redis
+# ✅ FIX: Install MongoDB extension 2.3.0 (latest stable, compatible with mongodb/mongodb 2.1.1)
+RUN pecl install mongodb \
+    && docker-php-ext-enable mongodb
+
+# Install Redis extension
+RUN pecl install redis \
+    && docker-php-ext-enable redis
+
+# ✅ FIX: Verify MongoDB extension is enabled
+RUN php -m | grep mongodb
 
 # Configure PHP for large file uploads
 RUN echo "upload_max_filesize = 10M" >> /usr/local/etc/php/conf.d/uploads.ini \
@@ -39,7 +46,7 @@ RUN echo "upload_max_filesize = 10M" >> /usr/local/etc/php/conf.d/uploads.ini \
     && echo "max_execution_time = 300" >> /usr/local/etc/php/conf.d/uploads.ini \
     && echo "max_input_time = 300" >> /usr/local/etc/php/conf.d/uploads.ini
 
-# Get latest Composer
+# Copy Composer from official image
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 # Set working directory
@@ -60,8 +67,8 @@ RUN composer install --no-interaction --prefer-dist --optimize-autoloader
 # Run composer dump-autoload
 RUN composer dump-autoload --optimize
 
-# Set proper permissions
-RUN chown -R www-data:www-data /var/www/html \
+# Set permissions
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
 # ✅ FIX 4: Cache Laravel configuration (now .env exists)

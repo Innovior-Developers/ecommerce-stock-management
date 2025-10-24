@@ -24,7 +24,9 @@ class PayHereService implements PaymentGatewayInterface
     {
         try {
             $orderId = QuerySanitizer::sanitizeMongoId($data['order_id']);
-            $amount = number_format($data['amount'], 2, '.', '');
+
+            // ✅ SIMPLIFIED: Direct float usage
+            $amount = number_format((float) $data['amount'], 2, '.', '');
 
             if (!$orderId) {
                 return [
@@ -33,7 +35,12 @@ class PayHereService implements PaymentGatewayInterface
                 ];
             }
 
-            // ✅ Generate PayHere hash
+            Log::info('PayHere Payment Creation', [
+                'amount' => $amount,
+                'order_id' => $orderId,
+            ]);
+
+            // Generate PayHere hash
             $hash = strtoupper(
                 md5(
                     $this->merchantId .
@@ -63,16 +70,17 @@ class PayHereService implements PaymentGatewayInterface
                 'hash' => $hash,
             ];
 
-            Log::info('PayHere Payment Created', [
+            Log::info('PayHere Payment Data Prepared', [
                 'order_id' => $orderId,
                 'amount' => $amount,
             ]);
 
             return [
                 'success' => true,
-                'transaction_id' => $orderId, // PayHere uses order_id as transaction reference
+                'transaction_id' => $orderId,
                 'payment_data' => $paymentData,
-                'action_url' => $this->baseUrl . '/pay/checkout',
+                'action_url' => "{$this->baseUrl}/pay/checkout",
+                'status' => 'pending',
             ];
         } catch (\Exception $e) {
             Log::error('PayHere Payment Error', [

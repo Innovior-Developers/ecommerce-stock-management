@@ -21,7 +21,9 @@ class PayPalService implements PaymentGatewayInterface
     {
         try {
             $orderId = QuerySanitizer::sanitizeMongoId($data['order_id']);
-            $amount = number_format($data['amount'], 2, '.', '');
+
+            // ✅ SIMPLIFIED: Direct float usage
+            $amount = number_format((float) $data['amount'], 2, '.', '');
 
             if (!$orderId) {
                 return [
@@ -29,6 +31,12 @@ class PayPalService implements PaymentGatewayInterface
                     'error' => 'Invalid order ID',
                 ];
             }
+
+            Log::info('PayPal Payment Creation', [
+                'amount' => $amount,
+                'currency' => $data['currency'],
+                'order_id' => $orderId,
+            ]);
 
             $order = $this->paypal->createOrder([
                 'intent' => 'CAPTURE',
@@ -71,14 +79,14 @@ class PayPalService implements PaymentGatewayInterface
 
             Log::info('PayPal Order Created', [
                 'order_id' => $order['id'],
-                'status' => $order['status'],
+                'approval_url' => $approvalUrl,
             ]);
 
             return [
                 'success' => true,
                 'transaction_id' => $order['id'],
                 'approval_url' => $approvalUrl,
-                'status' => strtolower($order['status']),
+                'status' => 'pending',
             ];
         } catch (\Exception $e) {
             Log::error('PayPal Payment Error', [
@@ -211,7 +219,6 @@ class PayPalService implements PaymentGatewayInterface
                 return 'unknown';
             }
 
-            // Map PayPal statuses to our internal statuses
             return match (strtoupper($order['status'])) {
                 'COMPLETED' => 'completed',
                 'APPROVED' => 'processing',

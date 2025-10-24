@@ -28,3 +28,11 @@ C:\Users\CHAMA COMPUTERS>stripe listen --forward-to localhost:8000/api/webhooks/
 A newer version of the Stripe CLI is available, please update to: v1.31.1
 > Ready! You are using Stripe API Version [2025-09-30.clover]. 
 Your webhook signing secret is whsec_36951bc6ad47b3a22c92cc32135183cb8253579410c127d46095edabf5b552fc (^C to quit)
+
+
+
+docker-compose exec laravel bash
+tail -f storage/logs/laravel.log
+
+cd server/ecommerce-stock-management
+tail -f storage/logs/laravel.log
