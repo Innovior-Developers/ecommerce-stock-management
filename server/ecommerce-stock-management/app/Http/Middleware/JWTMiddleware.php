@@ -8,6 +8,7 @@ use Tymon\JWTAuth\Facades\JWTAuth;
 use Tymon\JWTAuth\Exceptions\JWTException;
 use Tymon\JWTAuth\Exceptions\TokenExpiredException;
 use Tymon\JWTAuth\Exceptions\TokenInvalidException;
+use App\Models\JwtBlacklist;
 
 class JWTMiddleware
 {
@@ -17,6 +18,24 @@ class JWTMiddleware
     public function handle(Request $request, Closure $next)
     {
         try {
+            $token = JWTAuth::getToken();
+
+            if (!$token) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Token not provided'
+                ], 401);
+            }
+
+            // ✅ Check if token is blacklisted
+            if (JwtBlacklist::isBlacklisted($token->get())) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Token has been revoked',
+                    'error_code' => 'TOKEN_REVOKED'
+                ], 401);
+            }
+
             $user = JWTAuth::parseToken()->authenticate();
 
             if (!$user) {
@@ -25,6 +44,8 @@ class JWTMiddleware
                     'message' => 'User not found'
                 ], 404);
             }
+
+            return $next($request);
         } catch (TokenExpiredException $e) {
             return response()->json([
                 'success' => false,
@@ -40,11 +61,8 @@ class JWTMiddleware
         } catch (JWTException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Token is required',
-                'error_code' => 'TOKEN_ABSENT'
+                'message' => 'Token error: ' . $e->getMessage()
             ], 401);
         }
-
-        return $next($request);
     }
 }

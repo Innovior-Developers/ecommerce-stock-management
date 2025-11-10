@@ -34,7 +34,7 @@ const Header = ({ isAdmin = false }: HeaderProps) => {
   const navigate = useNavigate();
 
   const { isAuthenticated, user } = useAppSelector((state) => state.auth);
-  const cartItemCount = useAppSelector((state) => state.cart.itemCount); // ✅ Get from cart state
+  const cartItemCount = useAppSelector((state) => state.cart.itemCount);
   const [logout, { isLoading: isLoggingOut }] = useLogoutMutation();
 
   const handleSearch = (e: React.FormEvent) => {
@@ -50,7 +50,6 @@ const Header = ({ isAdmin = false }: HeaderProps) => {
       toast.success("Logged out successfully");
       navigate("/");
     } catch (error: unknown) {
-      // Show error message if 401
       if (error?.status === 401) {
         toast.error(
           error?.data?.message || "Session expired. You have been logged out."
@@ -62,12 +61,24 @@ const Header = ({ isAdmin = false }: HeaderProps) => {
     }
   };
 
+  // ✅ OPTION 1: Hide cart only on admin dashboard page (recommended)
+  const shouldShowCart = !isAdmin;
+
+  // ✅ OPTION 2: Show cart for everyone (if you want admins to shop too)
+  // const shouldShowCart = true;
+
+  // ✅ OPTION 3: Hide cart only for admin users everywhere
+  // const shouldShowCart = user?.role !== "admin";
+
   return (
-    <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
-          <Link to="/" className="flex items-center space-x-2">
+          <Link
+            to="/"
+            className="flex items-center space-x-2 hover:opacity-80 transition-opacity"
+          >
             <div className="h-8 w-8 bg-primary rounded-md flex items-center justify-center">
               <span className="text-primary-foreground font-bold text-sm">
                 S
@@ -95,42 +106,42 @@ const Header = ({ isAdmin = false }: HeaderProps) => {
             </form>
           )}
 
-          {/* Navigation Links */}
-          <nav className="flex items-center space-x-4">
+          {/* Navigation Links - Hidden on mobile */}
+          <nav className="hidden lg:flex items-center space-x-6">
             <Link
               to="/"
-              className="hover:text-primary transition-colors duration-200"
+              className="text-sm font-medium hover:text-primary transition-colors duration-200"
             >
               Home
             </Link>
             <Link
               to="/shop"
-              className="hover:text-primary transition-colors duration-200"
+              className="text-sm font-medium hover:text-primary transition-colors duration-200"
             >
               Shop
             </Link>
             <Link
               to="/deals"
-              className="hover:text-primary transition-colors duration-200"
+              className="text-sm font-medium hover:text-primary transition-colors duration-200"
             >
               Deals
             </Link>
             <Link
               to="/about"
-              className="hover:text-primary transition-colors duration-200"
+              className="text-sm font-medium hover:text-primary transition-colors duration-200"
             >
               About
             </Link>
             <Link
               to="/contact"
-              className="hover:text-primary transition-colors duration-200"
+              className="text-sm font-medium hover:text-primary transition-colors duration-200"
             >
               Contact
             </Link>
             {isAuthenticated && user?.role === "admin" && (
               <Link
                 to="/admin"
-                className="hover:text-primary transition-colors duration-200 text-primary font-semibold"
+                className="text-sm font-medium hover:text-primary transition-colors duration-200 text-primary font-semibold"
               >
                 Admin
               </Link>
@@ -138,17 +149,36 @@ const Header = ({ isAdmin = false }: HeaderProps) => {
           </nav>
 
           {/* Navigation Icons */}
-          <div className="flex items-center space-x-4">
-            {/* Cart - Show for all users, not just authenticated */}
-            {!isAdmin && user?.role !== "admin" && (
+          <div className="flex items-center space-x-2">
+            {/* ✅ Cart Icon - Show based on shouldShowCart logic */}
+            {shouldShowCart && (
               <Link to="/cart">
-                <Button variant="ghost" size="icon" className="relative">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="relative hover:bg-primary/10 transition-colors"
+                  aria-label="Shopping cart"
+                >
                   <ShoppingCart className="h-5 w-5" />
                   {cartItemCount > 0 && (
-                    <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs">
-                      {cartItemCount}
+                    <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs animate-in zoom-in-50">
+                      {cartItemCount > 99 ? "99+" : cartItemCount}
                     </Badge>
                   )}
+                </Button>
+              </Link>
+            )}
+
+            {/* Wishlist Icon - Optional */}
+            {shouldShowCart && isAuthenticated && (
+              <Link to="/wishlist">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="hover:bg-primary/10 transition-colors"
+                  aria-label="Wishlist"
+                >
+                  <Heart className="h-5 w-5" />
                 </Button>
               </Link>
             )}
@@ -159,11 +189,11 @@ const Header = ({ isAdmin = false }: HeaderProps) => {
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
-                    className="relative h-8 w-8 rounded-full"
+                    className="relative h-8 w-8 rounded-full hover:bg-primary/10"
                   >
                     <Avatar className="h-8 w-8">
                       <AvatarImage src={user?.avatar} alt={user?.name} />
-                      <AvatarFallback>
+                      <AvatarFallback className="bg-primary text-primary-foreground">
                         {user?.name?.charAt(0)?.toUpperCase() || "U"}
                       </AvatarFallback>
                     </Avatar>
@@ -183,7 +213,10 @@ const Header = ({ isAdmin = false }: HeaderProps) => {
                   {user?.role === "admin" && (
                     <>
                       <DropdownMenuItem asChild>
-                        <Link to="/admin" className="flex items-center">
+                        <Link
+                          to="/admin"
+                          className="flex items-center cursor-pointer"
+                        >
                           <Shield className="mr-2 h-4 w-4" />
                           Admin Dashboard
                         </Link>
@@ -193,15 +226,21 @@ const Header = ({ isAdmin = false }: HeaderProps) => {
                   )}
 
                   <DropdownMenuItem asChild>
-                    <Link to="/profile" className="flex items-center">
+                    <Link
+                      to="/profile"
+                      className="flex items-center cursor-pointer"
+                    >
                       <User className="mr-2 h-4 w-4" />
                       Profile
                     </Link>
                   </DropdownMenuItem>
 
-                  {!isAdmin && (
+                  {user?.role !== "admin" && (
                     <DropdownMenuItem asChild>
-                      <Link to="/orders" className="flex items-center">
+                      <Link
+                        to="/orders"
+                        className="flex items-center cursor-pointer"
+                      >
                         <Settings className="mr-2 h-4 w-4" />
                         Orders
                       </Link>
@@ -212,7 +251,7 @@ const Header = ({ isAdmin = false }: HeaderProps) => {
                   <DropdownMenuItem
                     onClick={handleLogout}
                     disabled={isLoggingOut}
-                    className="flex items-center text-red-600"
+                    className="flex items-center text-red-600 cursor-pointer focus:text-red-600"
                   >
                     <LogOut className="mr-2 h-4 w-4" />
                     {isLoggingOut ? "Logging out..." : "Log out"}
@@ -221,17 +260,17 @@ const Header = ({ isAdmin = false }: HeaderProps) => {
               </DropdownMenu>
             ) : (
               <div className="flex items-center space-x-2">
-                <Button variant="ghost" asChild>
+                <Button variant="ghost" size="sm" asChild>
                   <Link to="/login">Login</Link>
                 </Button>
-                <Button asChild>
+                <Button size="sm" asChild>
                   <Link to="/register">Sign Up</Link>
                 </Button>
               </div>
             )}
 
             {/* Mobile menu */}
-            <Button variant="ghost" size="icon" className="md:hidden">
+            <Button variant="ghost" size="icon" className="lg:hidden">
               <Menu className="h-5 w-5" />
               <span className="sr-only">Menu</span>
             </Button>

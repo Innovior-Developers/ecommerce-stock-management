@@ -5,11 +5,11 @@ namespace App\Models;
 use MongoDB\Laravel\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Tymon\JWTAuth\Contracts\JWTSubject;
-use Illuminate\Support\Facades\Hash;
+use App\Traits\MongoIdHelper;
 
 class User extends Authenticatable implements JWTSubject
 {
-    use Notifiable;
+    use Notifiable, MongoIdHelper;
 
     protected $connection = 'mongodb';
     protected $collection = 'users';
@@ -30,28 +30,40 @@ class User extends Authenticatable implements JWTSubject
     ];
 
     protected $casts = [
+        '_id' => 'string',
         'email_verified_at' => 'datetime',
     ];
-
-    // ✅ Auto-hash password on save
-    public function setPasswordAttribute($value)
-    {
-        $this->attributes['password'] = Hash::make($value);
-    }
 
     // JWT methods
     public function getJWTIdentifier()
     {
-        return $this->getKey();
+        return (string) $this->_id;
     }
 
     public function getJWTCustomClaims()
     {
-        return [
-            'role' => $this->role,
-            'status' => $this->status,
-            'email' => $this->email,
-            'name' => $this->name,
-        ];
+        return [];
+    }
+
+    // ✅ ADD: Role checking helper methods
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
+
+    public function isCustomer(): bool
+    {
+        return $this->role === 'customer';
+    }
+
+    public function hasRole(string $role): bool
+    {
+        return $this->role === $role;
+    }
+
+    // Relationships
+    public function customer()
+    {
+        return $this->hasOne(Customer::class, 'user_id', '_id');
     }
 }

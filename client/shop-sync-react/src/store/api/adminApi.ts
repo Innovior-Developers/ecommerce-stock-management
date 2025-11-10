@@ -1,104 +1,138 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
-import type { RootState } from "../index";
+import type { RootState } from "..";
+import {
+  normalizeMongoObject,
+  normalizeMongoArray,
+} from "@/utils/normalizeMongoId";
+
+const adminBaseQuery = fetchBaseQuery({
+  baseUrl: "http://localhost:8000/api/admin",
+  prepareHeaders: (headers, { getState }) => {
+    const token = (getState() as RootState).auth.token;
+    if (token) {
+      headers.set("authorization", `Bearer ${token}`);
+    }
+    headers.set("accept", "application/json");
+    // ✅ DON'T set content-type here - let browser set it for FormData
+    return headers;
+  },
+});
 
 export const adminApi = createApi({
   reducerPath: "adminApi",
-  baseQuery: fetchBaseQuery({
-    baseUrl: "http://localhost:8000/api/admin",
-    prepareHeaders: (headers, { getState }) => {
-      const token = (getState() as RootState).auth.token;
-      if (token) {
-        headers.set("authorization", `Bearer ${token}`);
-      }
-      headers.set("Accept", "application/json");
-      // ✅ FIX: Do not set Content-Type here. Let the browser handle it for FormData.
-      return headers;
-    },
-  }),
+  baseQuery: adminBaseQuery,
   tagTypes: ["Product", "Category", "Customer", "Order", "Inventory"],
   endpoints: (builder) => ({
     // Products
-    getProducts: builder.query<unknown, { search?: string }>({
-      query: ({ search }) => ({
-        url: "/products",
-        params: search ? { search } : {},
-      }),
+    getProducts: builder.query({
+      query: ({ search = "" }) => `/products?search=${search}`,
+      transformResponse: (response: unknown) => {
+        const data = response?.data?.data || response?.data || [];
+        return {
+          ...response,
+          data: {
+            ...response.data,
+            data: normalizeMongoArray(data),
+          },
+        };
+      },
       providesTags: ["Product"],
     }),
 
-    createProduct: builder.mutation<unknown, FormData>({
+    createProduct: builder.mutation({
       query: (formData) => ({
         url: "/products",
         method: "POST",
         body: formData,
+        // ✅ Remove headers - browser will set correct multipart/form-data
       }),
-      invalidatesTags: ["Product", "Inventory"],
-      // ✅ Add this to force refresh
-      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
-        try {
-          await queryFulfilled;
-          // Force refresh the products list
-          dispatch(adminApi.util.invalidateTags(["Product"]));
-        } catch {
-          /* empty */
-        }
+      transformResponse: (response: unknown) => {
+        return {
+          ...response,
+          data: normalizeMongoObject(response.data),
+        };
       },
+      invalidatesTags: ["Product", "Inventory"],
     }),
 
-    updateProduct: builder.mutation<unknown, { id: string; data: FormData }>({
+    // ✅ FIX: Change from PUT to POST for file upload support
+    updateProduct: builder.mutation({
       query: ({ id, data }) => ({
         url: `/products/${id}`,
-        method: "POST", // ✅ Change PUT to POST
+        method: "POST", // ✅ Changed from PUT to POST
         body: data,
+        // ✅ Remove headers - browser will set correct multipart/form-data
       }),
+      transformResponse: (response: unknown) => {
+        return {
+          ...response,
+          data: normalizeMongoObject(response.data),
+        };
+      },
       invalidatesTags: ["Product", "Inventory"],
     }),
 
-    deleteProduct: builder.mutation<unknown, string>({
+    deleteProduct: builder.mutation({
       query: (id) => ({
         url: `/products/${id}`,
         method: "DELETE",
       }),
       invalidatesTags: ["Product", "Inventory"],
-      async onQueryStarted(id, { dispatch, queryFulfilled }) {
-        try {
-          await queryFulfilled;
-          // Force refresh the products list
-          dispatch(adminApi.util.invalidateTags(["Product", "Inventory"]));
-        } catch {
-          /* empty */
-        }
-      },
     }),
 
     // Categories
-    getCategories: builder.query<unknown, { search?: string }>({
-      query: ({ search }) => ({
-        url: "/categories",
-        params: search ? { search } : {},
-      }),
+    getCategories: builder.query({
+      query: ({ search = "" }) => `/categories?search=${search}`,
+      transformResponse: (response: unknown) => {
+        const data = response?.data?.data || response?.data || [];
+        return {
+          ...response,
+          data: {
+            ...response.data,
+            data: normalizeMongoArray(data),
+          },
+        };
+      },
       providesTags: ["Category"],
     }),
 
-    createCategory: builder.mutation<unknown, unknown>({
-      query: (categoryData) => ({
+    createCategory: builder.mutation({
+      query: (data) => ({
         url: "/categories",
         method: "POST",
-        body: categoryData,
+        body: data,
+        headers: {
+          "content-type": "application/json", // ✅ Categories use JSON
+        },
       }),
+      transformResponse: (response: unknown) => {
+        return {
+          ...response,
+          data: normalizeMongoObject(response.data),
+        };
+      },
       invalidatesTags: ["Category"],
     }),
 
-    updateCategory: builder.mutation<unknown, { id: string; data: unknown }>({
+    updateCategory: builder.mutation({
       query: ({ id, data }) => ({
         url: `/categories/${id}`,
-        method: "PUT",
+        method: "PUT", // ✅ Categories can use PUT (no files)
         body: data,
+        headers: {
+          "content-type": "application/json", // ✅ Categories use JSON
+        },
       }),
+      transformResponse: (response: unknown) => {
+        return {
+          ...response,
+          data: normalizeMongoObject(response.data),
+        };
+      },
       invalidatesTags: ["Category"],
     }),
 
-    deleteCategory: builder.mutation<unknown, string>({
+    deleteCategory: builder.mutation({
       query: (id) => ({
         url: `/categories/${id}`,
         method: "DELETE",
@@ -107,47 +141,90 @@ export const adminApi = createApi({
     }),
 
     // Customers
-    getCustomers: builder.query<unknown, { search?: string }>({
-      query: ({ search }) => ({
-        url: "/customers",
-        params: search ? { search } : {},
-      }),
+    getCustomers: builder.query({
+      query: ({ search = "" }) => `/customers?search=${search}`,
+      transformResponse: (response: unknown) => {
+        const data = response?.data?.data || response?.data || [];
+        return {
+          ...response,
+          data: {
+            ...response.data,
+            data: normalizeMongoArray(data),
+          },
+        };
+      },
       providesTags: ["Customer"],
     }),
 
     // Orders
-    getOrders: builder.query<unknown, void>({
+    getOrders: builder.query({
       query: () => "/orders",
+      transformResponse: (response: unknown) => {
+        const data = response?.data?.data || response?.data || [];
+        return {
+          ...response,
+          data: {
+            ...response.data,
+            data: normalizeMongoArray(data),
+          },
+        };
+      },
       providesTags: ["Order"],
     }),
 
-    updateOrder: builder.mutation<unknown, { id: string; data: unknown }>({
-      query: ({ id, data }) => ({
+    updateOrder: builder.mutation({
+      query: ({ id, status }) => ({
         url: `/orders/${id}`,
         method: "PUT",
-        body: data,
+        body: { status },
+        headers: {
+          "content-type": "application/json",
+        },
       }),
+      transformResponse: (response: unknown) => {
+        return {
+          ...response,
+          data: normalizeMongoObject(response.data),
+        };
+      },
       invalidatesTags: ["Order"],
     }),
 
     // Inventory
-    getStockLevels: builder.query<unknown, void>({
-      query: () => "/inventory/stock-levels",
+    getStockLevels: builder.query({
+      query: () => "/inventory",
+      transformResponse: (response: unknown) => {
+        const data = response?.data || [];
+        return normalizeMongoArray(data);
+      },
       providesTags: ["Inventory"],
     }),
 
-    getLowStock: builder.query<unknown, void>({
+    getLowStock: builder.query({
       query: () => "/inventory/low-stock",
+      transformResponse: (response: unknown) => {
+        const data = response?.data || [];
+        return normalizeMongoArray(data);
+      },
       providesTags: ["Inventory"],
     }),
 
-    updateStock: builder.mutation<unknown, { id: string; data: unknown }>({
+    updateStock: builder.mutation({
       query: ({ id, data }) => ({
-        url: `/inventory/stock/${id}`,
+        url: `/inventory/${id}`,
         method: "PUT",
         body: data,
+        headers: {
+          "content-type": "application/json",
+        },
       }),
-      invalidatesTags: ["Inventory"],
+      transformResponse: (response: unknown) => {
+        return {
+          ...response,
+          data: normalizeMongoObject(response.data),
+        };
+      },
+      invalidatesTags: ["Inventory", "Product"],
     }),
   }),
 });

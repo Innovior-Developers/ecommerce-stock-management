@@ -25,6 +25,7 @@ import { useGetProductsQuery, Product } from "@/store/api/productsApi";
 import { useAppDispatch } from "@/store/hooks";
 import { addToCart } from "@/store/slices/cartSlice";
 import { toast } from "sonner";
+import { normalizeMongoId } from "@/utils/normalizeMongoId";
 
 interface ProductGridProps {
   itemsPerPage?: number;
@@ -36,10 +37,11 @@ interface ProductGridProps {
 
 const ProductGrid = ({
   itemsPerPage = 8,
+  category,
   showHeader = true,
   showFilters = true,
-  title = "Featured Products",
-  description = "Discover our curated collection of premium items",
+  title = "All Products",
+  description,
 }: ProductGridProps) => {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("featured");
@@ -50,17 +52,25 @@ const ProductGrid = ({
 
   // Fetch products from API
   const {
-    data: productsResponse,
+    data: products = [], // ✅ FIX: Directly use the transformed data with fallback
     isLoading,
     error,
   } = useGetProductsQuery({
     search: searchQuery,
   });
 
-  const products = productsResponse?.data || [];
+  // ✅ ADD: Debug logging
+  console.log("🛒 ProductGrid - Products:", products);
+  console.log("🛒 ProductGrid - Products count:", products?.length || 0);
+  console.log("🛒 ProductGrid - Is Loading:", isLoading);
+  console.log("🛒 ProductGrid - Error:", error);
 
   // Get unique categories from products
   const categories = useMemo(() => {
+    if (!products || products.length === 0) {
+      return [{ id: "all", name: "All Products", count: 0 }];
+    }
+
     const uniqueCategories = new Set(products.map((p) => p.category));
     return [
       { id: "all", name: "All Products", count: products.length },
@@ -215,6 +225,12 @@ const ProductGrid = ({
     );
   }
 
+  // ✅ Generate safe unique keys for products
+  const getProductKey = (product: Product, index: number): string => {
+    const id = normalizeMongoId(product._id) || normalizeMongoId(product.id);
+    return id || `product-${product.name}-${index}`;
+  };
+
   return (
     <section className="py-12 bg-background">
       <div className="container mx-auto px-4">
@@ -278,9 +294,9 @@ const ProductGrid = ({
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {currentProducts.map((product) => {
-                const productKey =
-                  product._id || product.id || `product-${product.name}`;
+              {currentProducts.map((product, index) => {
+                // ✅ Use safe key generation
+                const productKey = getProductKey(product, index);
 
                 return (
                   <ProductCard

@@ -4,11 +4,18 @@ namespace App\Models;
 
 use MongoDB\Laravel\Eloquent\Model;
 use MongoDB\Laravel\Relations\BelongsTo;
+use App\Traits\MongoIdHelper;
 
 class Order extends Model
 {
+    use MongoIdHelper;
+
     protected $connection = 'mongodb';
     protected $collection = 'orders';
+
+    protected $primaryKey = '_id';
+    protected $keyType = 'string';
+    public $incrementing = false;
 
     protected $fillable = [
         'order_number',
@@ -29,30 +36,27 @@ class Order extends Model
     ];
 
     protected $casts = [
+        '_id' => 'string',
+        'customer_id' => 'string',
         'items' => 'array',
         'shipping_address' => 'array',
         'billing_address' => 'array',
         'payment' => 'array',
-        'subtotal' => 'decimal:2',
-        'tax' => 'decimal:2',
-        'shipping_cost' => 'decimal:2',
-        'total' => 'decimal:2',
+        // ✅ FIX: Store as float, not decimal
+        'subtotal' => 'float',
+        'tax' => 'float',
+        'shipping_cost' => 'float',
+        'total' => 'float',
         'shipped_at' => 'datetime',
         'delivered_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
 
-    // Fixed relationship - should reference Customer, not User
+    // Relationships
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class, 'customer_id', '_id');
-    }
-
-    // Relationship to user through customer
-    public function user()
-    {
-        return $this->hasOneThrough(User::class, Customer::class, '_id', '_id', 'customer_id', 'user_id');
     }
 
     // Scopes

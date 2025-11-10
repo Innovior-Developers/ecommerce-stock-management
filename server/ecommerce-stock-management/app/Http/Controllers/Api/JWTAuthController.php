@@ -12,6 +12,10 @@ use Tymon\JWTAuth\Facades\JWTAuth;
 use Tymon\JWTAuth\Exceptions\JWTException;
 use Tymon\JWTAuth\Exceptions\TokenExpiredException;
 use Tymon\JWTAuth\Exceptions\TokenInvalidException;
+use App\Services\QuerySanitizer;
+use Illuminate\Support\Facades\Log;
+use App\Models\JwtBlacklist;
+use Illuminate\Validation\Rules\Password;
 
 class JWTAuthController extends Controller
 {
@@ -25,7 +29,9 @@ class JWTAuthController extends Controller
             'password' => 'required|string',
         ]);
 
-        $user = User::where('email', $credentials['email'])->first();
+        $email = QuerySanitizer::sanitize($credentials['email']);
+
+        $user = User::where('email', $email)->first();
 
         if (!$user || !Hash::check($credentials['password'], $user->password)) {
             throw ValidationException::withMessages([
@@ -62,7 +68,9 @@ class JWTAuthController extends Controller
             'password' => 'required|string',
         ]);
 
-        $user = User::where('email', $credentials['email'])->where('role', 'customer')->first();
+        $email = QuerySanitizer::sanitize($credentials['email']);
+
+        $user = User::where('email', $email)->where('role', 'customer')->first();
 
         if (!$user || !Hash::check($credentials['password'], $user->password)) {
             throw ValidationException::withMessages([
@@ -83,46 +91,114 @@ class JWTAuthController extends Controller
     }
 
     /**
-     * Customer Register
+     * Customer Registration with Strong Password Validation
      */
     public function customerRegister(Request $request)
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:8|confirmed',
-            'first_name' => 'nullable|string|max:255',
-            'last_name' => 'nullable|string|max:255',
-            'phone' => 'nullable|string|max:20',
-        ]);
+        try {
+            $validated = $request->validate([
+                'name' => 'required|string|max:255',
+                'email' => [
+                    'required',
+                    'string',
+                    'email',
+                    'max:255',
+                    'unique:users',
+                ],
+                'password' => [
+                    'required',
+                    'string',
+                    'confirmed',
+                    Password::min(12)
+                        ->letters()
+                        ->mixedCase()
+                        ->numbers()
+                        ->symbols()
+                        ->uncompromised(),
+                ],
+                'first_name' => 'nullable|string|max:255',
+                'last_name' => 'nullable|string|max:255',
+                'phone' => 'nullable|string|max:20',
+            ], [
+                'password.min' => 'Password must be at least 12 characters long.',
+                'password.mixed' => 'Password must contain both uppercase and lowercase letters.',
+                'password.numbers' => 'Password must contain at least one number.',
+                'password.symbols' => 'Password must contain at least one special character.',
+                'password.uncompromised' => 'This password has been found in data breaches. Please choose a different password.',
+            ]);
 
-        $user = User::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'password' => $validated['password'],
-            'role' => 'customer',
-            'status' => 'active',
-            'email_verified_at' => now(),
-        ]);
+            // ✅ Sanitize inputs
+            $validated['name'] = QuerySanitizer::sanitize($validated['name']);
+            $validated['email'] = QuerySanitizer::sanitize($validated['email']);
 
-        // Create customer profile
-        Customer::create([
-            'user_id' => $user->_id,
-            'first_name' => $validated['first_name'] ?? '',
-            'last_name' => $validated['last_name'] ?? '',
-            'phone' => $validated['phone'] ?? '',
-            'marketing_consent' => false,
-        ]);
+            if (isset($validated['first_name'])) {
+                $validated['first_name'] = QuerySanitizer::sanitize($validated['first_name']);
+            }
+            if (isset($validated['last_name'])) {
+                $validated['last_name'] = QuerySanitizer::sanitize($validated['last_name']);
+            }
+            if (isset($validated['phone'])) {
+                $validated['phone'] = QuerySanitizer::sanitize($validated['phone']);
+            }
 
-        $token = JWTAuth::fromUser($user);
+            // Create user
+            $user = User::create([
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'password' => Hash::make($validated['password']),
+                'role' => 'customer',
+                'status' => 'active',
+                'email_verified_at' => now(),
+            ]);
 
-        return $this->respondWithToken($token, $user, 'Registration successful', 201);
+            // The MongoIdHelper trait automatically converts _id to string
+            Log::info('User created', [
+                'user_id' => $user->_id,
+                'user_id_type' => gettype($user->_id),
+            ]);
+
+            // Create customer profile
+            Customer::create([
+                'user_id' => (string) $user->_id,
+                'first_name' => $validated['first_name'] ?? '',
+                'last_name' => $validated['last_name'] ?? '',
+                'phone' => $validated['phone'] ?? '',
+                'marketing_consent' => false,
+            ]);
+
+            // Generate JWT token directly from the created user
+            $token = JWTAuth::fromUser($user);
+
+            Log::info('Registration successful', [
+                'user_id' => $user->_id,
+                'token_generated' => !empty($token),
+            ]);
+
+            return $this->respondWithToken($token, $user, 'Registration successful', 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Registration error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Registration failed: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 
     /**
      * Get the authenticated User
+     * ✅ CHANGED: Renamed from me() to user() to match route
      */
-    public function me()
+    public function user()
     {
         try {
             $user = JWTAuth::parseToken()->authenticate();
@@ -137,7 +213,6 @@ class JWTAuthController extends Controller
             return response()->json([
                 'success' => true,
                 'user' => [
-                    'id' => $user->_id,
                     'name' => $user->name,
                     'email' => $user->email,
                     'role' => $user->role,
@@ -167,12 +242,33 @@ class JWTAuthController extends Controller
     }
 
     /**
-     * Log the user out (Invalidate the token)
+     * Logout User (Invalidate token)
      */
     public function logout()
     {
         try {
-            JWTAuth::invalidate(JWTAuth::getToken());
+            $token = JWTAuth::getToken();
+
+            if (!$token) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No token provided'
+                ], 400);
+            }
+
+            // Get user before invalidating
+            $user = JWTAuth::parseToken()->authenticate();
+
+            // Add to blacklist BEFORE invalidating
+            JwtBlacklist::add(
+                $token->get(),
+                config('jwt.ttl'),
+                $user ? (string) $user->_id : null,
+                'user_logout'
+            );
+
+            // Invalidate the token
+            JWTAuth::invalidate($token);
 
             return response()->json([
                 'success' => true,
@@ -181,44 +277,135 @@ class JWTAuthController extends Controller
         } catch (JWTException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to logout, please try again.'
+                'message' => 'Failed to logout: ' . $e->getMessage()
             ], 500);
         }
     }
 
     /**
-     * Refresh a token
+     * Refresh JWT token
      */
     public function refresh()
     {
         try {
-            $token = JWTAuth::refresh(JWTAuth::getToken());
-            $user = JWTAuth::setToken($token)->toUser();
+            $newToken = JWTAuth::refresh(JWTAuth::getToken());
 
-            return $this->respondWithToken($token, $user, 'Token refreshed successfully');
+            return response()->json([
+                'success' => true,
+                'token' => $newToken,
+                'token_type' => 'bearer',
+                'expires_in' => config('jwt.ttl') * 60
+            ]);
         } catch (TokenExpiredException $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Token has expired and cannot be refreshed',
                 'error_code' => 'TOKEN_EXPIRED'
             ], 401);
-        } catch (TokenInvalidException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Token is invalid',
-                'error_code' => 'TOKEN_INVALID'
-            ], 401);
         } catch (JWTException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Token is required',
-                'error_code' => 'TOKEN_ABSENT'
-            ], 401);
+                'message' => 'Could not refresh token',
+                'error_code' => 'TOKEN_REFRESH_FAILED'
+            ], 500);
         }
     }
 
     /**
-     * Get the token array structure
+     * Update User Password
+     */
+    public function updatePassword(Request $request)
+    {
+        try {
+            $user = JWTAuth::parseToken()->authenticate();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not found'
+                ], 404);
+            }
+
+            $validated = $request->validate([
+                'current_password' => 'required|string',
+                'password' => [
+                    'required',
+                    'string',
+                    'confirmed',
+                    'different:current_password',     // ✅ New password must be different
+                    Password::min(12)
+                        ->mixedCase()
+                        ->numbers()
+                        ->symbols()
+                        ->uncompromised(),
+                ],
+                'password_confirmation' => 'required|string',
+            ], [
+                'password.min' => 'Password must be at least 12 characters long.',
+                'password.mixed' => 'Password must contain both uppercase and lowercase letters.',
+                'password.numbers' => 'Password must contain at least one number.',
+                'password.symbols' => 'Password must contain at least one special character.',
+                'password.uncompromised' => 'This password has been found in data breaches. Please choose a different password.',
+                'password.different' => 'New password must be different from current password.',
+            ]);
+
+            // Verify current password
+            if (!Hash::check($validated['current_password'], $user->password)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Current password is incorrect',
+                    'errors' => [
+                        'current_password' => ['The current password is incorrect.']
+                    ]
+                ], 422);
+            }
+
+            // Update password
+            User::where('_id', $user->_id)->update([
+                'password' => Hash::make($validated['password']),
+            ]);
+
+            // ✅ Optional: Invalidate all existing tokens and force re-login
+            // This is a security best practice after password change
+            $token = JWTAuth::getToken();
+            if ($token) {
+                JwtBlacklist::add(
+                    $token->get(),
+                    config('jwt.ttl'),
+                    (string) $user->_id,
+                    'password_change'
+                );
+            }
+
+            // Generate new token
+            $newToken = JWTAuth::fromUser($user);
+
+            Log::info('Password updated successfully', ['user_id' => $user->_id]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Password updated successfully. Please login with your new password.',
+                'token' => $newToken,
+                'token_type' => 'bearer',
+                'expires_in' => config('jwt.ttl') * 60
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Error updating password: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update password'
+            ], 500);
+        }
+    }
+
+    /**
+     * Get the token array structure.
      */
     protected function respondWithToken($token, $user, $message, $statusCode = 200)
     {
@@ -226,7 +413,6 @@ class JWTAuthController extends Controller
             'success' => true,
             'message' => $message,
             'user' => [
-                'id' => $user->_id,
                 'name' => $user->name,
                 'email' => $user->email,
                 'role' => $user->role,

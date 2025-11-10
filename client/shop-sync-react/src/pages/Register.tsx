@@ -13,6 +13,7 @@ import {
 import { useCustomerRegisterMutation } from "@/store/api/authApi";
 import { useAppSelector } from "@/store/hooks";
 import { toast } from "sonner";
+import { PasswordStrength } from "@/components/PasswordStrength"; // ✅ Add this import
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -69,10 +70,11 @@ const Register = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
-          <CardDescription>Sign up to get started</CardDescription>
+        <CardHeader>
+          <CardTitle>Create Account</CardTitle>
+          <CardDescription>Sign up to start shopping</CardDescription>
         </CardHeader>
+
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
@@ -141,11 +143,14 @@ const Register = () => {
                 id="password"
                 name="password"
                 type="password"
-                placeholder="Create a password"
+                placeholder="Create a strong password"
                 value={formData.password}
                 onChange={handleChange}
                 required
+                minLength={12}
               />
+              {/* ✅ Add password strength indicator */}
+              <PasswordStrength password={formData.password} />
             </div>
 
             <div className="space-y-2">
@@ -158,6 +163,7 @@ const Register = () => {
                 value={formData.password_confirmation}
                 onChange={handleChange}
                 required
+                minLength={12}
               />
             </div>
 

@@ -11,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { DollarSign, Package } from "lucide-react";
+import { normalizeMongoId } from "@/utils/normalizeMongoId";
 
 interface Product {
   _id: string;
@@ -41,6 +42,10 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
   onOpenChange,
 }) => {
   if (!product) return null;
+
+  // ✅ Normalize the product ID
+  const productId =
+    normalizeMongoId(product._id) || normalizeMongoId(product.id);
 
   // ✅ Helper functions to safely parse numbers
   const parsePrice = (price: number | string | undefined): number => {
@@ -87,10 +92,13 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl flex items-center gap-2">
-            <Package className="h-5 w-5" /> {product.name}
+          <DialogTitle className="text-2xl flex items-center gap-2">
+            <Package className="h-6 w-6" /> {product.name}
           </DialogTitle>
-          <DialogDescription>Product ID: {product._id}</DialogDescription>
+          <DialogDescription>
+            {/* ✅ Use normalized ID */}
+            Product ID: {productId} • SKU: {product.sku || "N/A"}
+          </DialogDescription>
         </DialogHeader>
 
         <Tabs defaultValue="details" className="w-full">
